@@ -45,8 +45,8 @@ import {
   DialogClose,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { type Customer, type InvoiceItem } from "@/lib/data";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { type Customer, type InvoiceItem, type Invoice } from "@/lib/data";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { PlaceHolderImages } from "@/lib/placeholder-images";
 import Image from "next/image";
 import { Badge } from "@/components/ui/badge";
@@ -66,7 +66,7 @@ const ServicesSubTable = ({ row }: { row: Row<Customer> }) => {
         return query(collection(firestore, 'invoices'), where('customerId', '==', customerId));
     }, [firestore, customerId]);
 
-    const { data: invoices, isLoading } = useCollection(invoicesQuery);
+    const { data: invoices, isLoading } = useCollection<Invoice>(invoicesQuery);
 
     const services = React.useMemo(() => {
         if (!invoices) return [];
@@ -78,7 +78,7 @@ const ServicesSubTable = ({ row }: { row: Row<Customer> }) => {
         return <div className="px-4 py-2 text-sm text-muted-foreground">Loading services...</div>
     }
 
-    if (!services.length) {
+    if (!services || services.length === 0) {
         return <div className="px-4 py-2 text-sm text-muted-foreground">No services found for this customer.</div>
     }
 
