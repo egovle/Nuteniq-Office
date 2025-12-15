@@ -18,16 +18,24 @@ const InvoiceDataExtractionInputSchema = z.object({
   invoiceDataUri: z
     .string()
     .describe(
-      'The invoice document, as a data URI that must include a MIME type and use Base64 encoding. Expected format: \'data:<mimetype>;base64,<encoded_data>\'.' 
+      'The invoice document, as a data URI that must include a MIME type and use Base64 encoding. Expected format: \'data:<mimetype>;base64,<encoded_data>\'.'
     ),
 });
 export type InvoiceDataExtractionInput = z.infer<typeof InvoiceDataExtractionInputSchema>;
+
+const InvoiceItemSchema = z.object({
+  name: z.string().describe('The description or name of the line item.'),
+  quantity: z.number().describe('The quantity of the item.'),
+  price: z.number().describe('The unit price of the item.'),
+  total: z.number().describe('The total price for the line item (quantity * price).'),
+});
 
 const InvoiceDataExtractionOutputSchema = z.object({
   invoiceNumber: z.string().optional().describe('The invoice number.'),
   customerName: z.string().describe('The name of the customer.'),
   date: z.string().describe('The invoice date.'),
   aadhaarNumber: z.string().optional().describe('The Aadhaar number of the customer.'),
+  items: z.array(InvoiceItemSchema).describe('A list of line items from the invoice.'),
 });
 export type InvoiceDataExtractionOutput = z.infer<typeof InvoiceDataExtractionOutputSchema>;
 
@@ -50,6 +58,7 @@ const invoiceDataExtractionPrompt = ai.definePrompt({
   - customerName: The name of the customer.
   - date: The invoice date.
   - aadhaarNumber: The Aadhaar number of the customer.
+  - items: A list of all line items in the invoice, each with a name, quantity, price, and total.
 
   If a field is not present, leave it blank.
   Ensure the output is valid JSON.`,

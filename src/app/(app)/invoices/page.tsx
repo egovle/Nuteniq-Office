@@ -16,13 +16,31 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { Upload } from "lucide-react";
+import { customers } from "@/lib/data";
 
 export default function InvoicePage() {
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<InvoiceDataExtractionOutput | null>(null);
+  const [result, setResult] = useState<InvoiceDataExtractionOutput | null>(
+    null
+  );
   const [preview, setPreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
@@ -40,28 +58,31 @@ export default function InvoicePage() {
     reader.onload = async () => {
       const dataUri = reader.result as string;
       try {
-        const extractedData = await extractInvoiceData({ invoiceDataUri: dataUri });
+        const extractedData = await extractInvoiceData({
+          invoiceDataUri: dataUri,
+        });
         setResult(extractedData);
       } catch (error) {
         console.error("Error extracting invoice data:", error);
         toast({
-            variant: "destructive",
-            title: "Extraction Failed",
-            description: "Could not extract data from the invoice. Please try a clearer image.",
+          variant: "destructive",
+          title: "Extraction Failed",
+          description:
+            "Could not extract data from the invoice. Please try a clearer image.",
         });
       } finally {
         setLoading(false);
       }
     };
     reader.onerror = (error) => {
-        console.error("File reading error:", error);
-        toast({
-            variant: "destructive",
-            title: "File Error",
-            description: "There was an error reading the uploaded file.",
-        });
-        setLoading(false);
-    }
+      console.error("File reading error:", error);
+      toast({
+        variant: "destructive",
+        title: "File Error",
+        description: "There was an error reading the uploaded file.",
+      });
+      setLoading(false);
+    };
   };
 
   const handleUploadClick = () => {
@@ -86,31 +107,47 @@ export default function InvoicePage() {
               <div className="flex flex-col items-center justify-center pt-5 pb-6">
                 <Upload className="w-10 h-10 mb-3 text-muted-foreground" />
                 <p className="mb-2 text-sm text-muted-foreground">
-                  <span className="font-semibold">Click to upload</span> or drag and drop
+                  <span className="font-semibold">Click to upload</span> or drag
+                  and drop
                 </p>
                 <p className="text-xs text-muted-foreground">
                   PNG, JPG, or PDF (MAX. 800x400px)
                 </p>
               </div>
-              <Input id="dropzone-file" type="file" className="hidden" ref={fileInputRef} onChange={handleFileChange} accept="image/png, image/jpeg, application/pdf" />
+              <Input
+                id="dropzone-file"
+                type="file"
+                className="hidden"
+                ref={fileInputRef}
+                onChange={handleFileChange}
+                accept="image/png, image/jpeg, application/pdf"
+              />
             </label>
           </div>
           {preview && (
             <div>
               <Label>Invoice Preview</Label>
               <div className="mt-2 overflow-hidden rounded-md border">
-                <img src={preview} alt="Invoice preview" className="w-full h-auto" />
+                <img
+                  src={preview}
+                  alt="Invoice preview"
+                  className="w-full h-auto"
+                />
               </div>
             </div>
           )}
         </CardContent>
         <CardFooter>
-            <Button onClick={handleUploadClick} disabled={loading} className="w-full">
-                {loading ? 'Processing...' : 'Upload an Invoice'}
-            </Button>
+          <Button
+            onClick={handleUploadClick}
+            disabled={loading}
+            className="w-full"
+          >
+            {loading ? "Processing..." : "Upload an Invoice"}
+          </Button>
         </CardFooter>
       </Card>
-      
+
       <Card>
         <CardHeader>
           <CardTitle>Extracted Data</CardTitle>
@@ -137,16 +174,32 @@ export default function InvoicePage() {
                 <Skeleton className="h-4 w-1/4" />
                 <Skeleton className="h-8 w-full" />
               </div>
+              <Skeleton className="h-24 w-full" />
             </div>
           ) : result ? (
             <div className="space-y-4">
               <div>
                 <Label htmlFor="customerName">Customer Name</Label>
-                <Input id="customerName" value={result.customerName || ""} readOnly />
+                <Select defaultValue={result.customerName}>
+                  <SelectTrigger id="customerName">
+                    <SelectValue placeholder="Select a customer" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {customers.map((c) => (
+                      <SelectItem key={c.id} value={c.name}>
+                        {c.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <Label htmlFor="invoiceNumber">Invoice Number</Label>
-                <Input id="invoiceNumber" value={result.invoiceNumber || ""} readOnly />
+                <Input
+                  id="invoiceNumber"
+                  value={result.invoiceNumber || ""}
+                  readOnly
+                />
               </div>
               <div>
                 <Label htmlFor="date">Date</Label>
@@ -154,19 +207,48 @@ export default function InvoicePage() {
               </div>
               <div>
                 <Label htmlFor="aadhaarNumber">Aadhaar Number</Label>
-                <Input id="aadhaarNumber" value={result.aadhaarNumber || ""} readOnly />
+                <Input
+                  id="aadhaarNumber"
+                  value={result.aadhaarNumber || ""}
+                  readOnly
+                />
+              </div>
+              <div>
+                <Label>Items</Label>
+                <div className="rounded-md border mt-2">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Item</TableHead>
+                        <TableHead className="text-right">Qty</TableHead>
+                        <TableHead className="text-right">Price</TableHead>
+                        <TableHead className="text-right">Total</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {result.items?.map((item, index) => (
+                        <TableRow key={index}>
+                          <TableCell>{item.name}</TableCell>
+                          <TableCell className="text-right">{item.quantity}</TableCell>
+                          <TableCell className="text-right">{item.price.toFixed(2)}</TableCell>
+                          <TableCell className="text-right">{item.total.toFixed(2)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
               </div>
             </div>
           ) : (
             <div className="flex items-center justify-center h-full text-muted-foreground">
-                <p>No data extracted yet.</p>
+              <p>No data extracted yet.</p>
             </div>
           )}
         </CardContent>
         {result && !loading && (
-            <CardFooter>
-                <Button className="w-full">Save Extracted Data</Button>
-            </CardFooter>
+          <CardFooter>
+            <Button className="w-full">Save Extracted Data</Button>
+          </CardFooter>
         )}
       </Card>
     </div>
