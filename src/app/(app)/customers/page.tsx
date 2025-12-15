@@ -48,6 +48,7 @@ import { customers, invoices, type Customer, type InvoiceItem } from "@/lib/data
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { PlaceHolderImages } from "@/lib/placeholder-images";
 import Image from "next/image";
+import { Badge } from "@/components/ui/badge";
 
 const data: Customer[] = customers;
 
@@ -73,6 +74,9 @@ const ServicesSubTable = ({ row }: { row: Row<Customer> }) => {
                 <TableHeader>
                     <TableRow>
                         <TableHead>Service/Item</TableHead>
+                        <TableHead>Acknowledgment No.</TableHead>
+                        <TableHead>Processed Date</TableHead>
+                        <TableHead>Status</TableHead>
                         <TableHead className="text-right">Quantity</TableHead>
                         <TableHead className="text-right">Price</TableHead>
                         <TableHead className="text-right">Total</TableHead>
@@ -82,6 +86,19 @@ const ServicesSubTable = ({ row }: { row: Row<Customer> }) => {
                     {services.map((item, index) => (
                         <TableRow key={index}>
                             <TableCell>{item.name}</TableCell>
+                            <TableCell>{item.acknowledgmentNumber || 'N/A'}</TableCell>
+                            <TableCell>{item.processedDate || 'N/A'}</TableCell>
+                            <TableCell>
+                                {item.status ? (
+                                    <Badge variant={
+                                        item.status === 'Completed' ? 'default' :
+                                        item.status === 'Cancelled by Customer' ? 'destructive' :
+                                        'secondary'
+                                    }>
+                                        {item.status}
+                                    </Badge>
+                                ) : 'N/A'}
+                            </TableCell>
                             <TableCell className="text-right">{item.quantity}</TableCell>
                             <TableCell className="text-right">₹{item.price.toFixed(2)}</TableCell>
                             <TableCell className="text-right">₹{item.total.toFixed(2)}</TableCell>
@@ -200,6 +217,12 @@ export const columns: ColumnDef<Customer>[] = [
                   </Label>
                   <Input id="phone" defaultValue={customer.phone} className="col-span-3" />
                 </div>
+                 <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="mobile" className="text-right">
+                    Mobile
+                  </Label>
+                  <Input id="mobile" defaultValue={customer.phone} className="col-span-3" />
+                </div>
                 <div className="grid grid-cols-4 items-center gap-4">
                   <Label htmlFor="aadhaar" className="text-right">
                     Aadhaar
@@ -268,6 +291,12 @@ export default function CustomersPage() {
                   Phone
                 </Label>
                 <Input id="phone" className="col-span-3" />
+              </div>
+               <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="mobile" className="text-right">
+                  Mobile
+                </Label>
+                <Input id="mobile" className="col-span-3" />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="aadhaar" className="text-right">

@@ -1,4 +1,5 @@
 
+
 export type Task = {
   id: string;
   title: string;
@@ -36,6 +37,9 @@ export type InvoiceItem = {
   quantity: number;
   price: number;
   total: number;
+  acknowledgmentNumber?: string;
+  processedDate?: string;
+  status?: 'Under Process' | 'Completed' | 'Cancelled by Customer';
 };
 
 export type Invoice = {
