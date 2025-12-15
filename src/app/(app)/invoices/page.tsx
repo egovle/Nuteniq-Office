@@ -94,7 +94,7 @@ export default function InvoicePage() {
         id: customerId,
         name: result.customerName,
         email: '',
-        phone: '',
+        phone: result.customerPhone || '',
         avatar: `avatar-${(customers.length % 6) + 1}`,
         aadhaar: result.aadhaarNumber || '',
         pan: ''
@@ -213,6 +213,10 @@ export default function InvoicePage() {
                 <Skeleton className="h-4 w-1/4" />
                 <Skeleton className="h-8 w-full" />
               </div>
+               <div className="space-y-2">
+                <Skeleton className="h-4 w-1/4" />
+                <Skeleton className="h-8 w-full" />
+              </div>
               <Skeleton className="h-24 w-full" />
             </div>
           ) : result ? (
@@ -222,6 +226,14 @@ export default function InvoicePage() {
                 <Input
                   id="customerName"
                   value={result.customerName || ""}
+                  readOnly
+                />
+              </div>
+               <div>
+                <Label htmlFor="customerPhone">Customer Phone</Label>
+                <Input
+                  id="customerPhone"
+                  value={result.customerPhone || ""}
                   readOnly
                 />
               </div>
@@ -275,6 +287,7 @@ export default function InvoicePage() {
             <div className="flex items-center justify-center h-full text-muted-foreground">
               <p>No data extracted yet.</p>
             </div>
+
           )}
         </CardContent>
         {result && !loading && (

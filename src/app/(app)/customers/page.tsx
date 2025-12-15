@@ -91,27 +91,76 @@ export const columns: ColumnDef<Customer>[] = [
       const customer = row.original;
       return (
         <div className="text-right">
+          <Dialog>
             <DropdownMenu>
-            <DropdownMenuTrigger asChild>
+              <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="h-8 w-8 p-0">
-                <span className="sr-only">Open menu</span>
-                <DotsHorizontalIcon className="h-4 w-4" />
+                  <span className="sr-only">Open menu</span>
+                  <DotsHorizontalIcon className="h-4 w-4" />
                 </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
                 <DropdownMenuLabel>Actions</DropdownMenuLabel>
                 <DropdownMenuItem
-                onClick={() => navigator.clipboard.writeText(customer.id)}
+                  onClick={() => navigator.clipboard.writeText(customer.id)}
                 >
-                Copy customer ID
+                  Copy customer ID
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem>Edit customer</DropdownMenuItem>
+                <DialogTrigger asChild>
+                  <DropdownMenuItem>Edit customer</DropdownMenuItem>
+                </DialogTrigger>
                 <DropdownMenuItem className="text-destructive">
-                Delete customer
+                  Delete customer
                 </DropdownMenuItem>
-            </DropdownMenuContent>
+              </DropdownMenuContent>
             </DropdownMenu>
+            <DialogContent className="sm:max-w-[425px]">
+              <DialogHeader>
+                <DialogTitle>Edit Customer</DialogTitle>
+                <DialogDescription>
+                  Update the details for the customer.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="name" className="text-right">
+                    Name
+                  </Label>
+                  <Input id="name" defaultValue={customer.name} className="col-span-3" />
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="email" className="text-right">
+                    Email
+                  </Label>
+                  <Input id="email" type="email" defaultValue={customer.email} className="col-span-3" />
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="phone" className="text-right">
+                    Phone
+                  </Label>
+                  <Input id="phone" defaultValue={customer.phone} className="col-span-3" />
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="aadhaar" className="text-right">
+                    Aadhaar
+                  </Label>
+                  <Input id="aadhaar" defaultValue={customer.aadhaar} className="col-span-3" />
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="pan" className="text-right">
+                    PAN
+                  </Label>
+                  <Input id="pan" defaultValue={customer.pan} className="col-span-3" />
+                </div>
+              </div>
+              <DialogFooter>
+                  <DialogClose asChild>
+                      <Button type="submit">Save Changes</Button>
+                  </DialogClose>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       );
     },

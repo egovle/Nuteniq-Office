@@ -66,7 +66,7 @@ import { CalendarIcon } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
-import { tasks, customers, employees, type Task } from "@/lib/data";
+import { tasks, customers, employees, invoices, type Task } from "@/lib/data";
 import { cn } from "@/lib/utils";
 
 const data: Task[] = tasks;
@@ -231,6 +231,23 @@ export default function TasksPage() {
                     {customers.map((c) => (
                       <SelectItem key={c.id} value={c.name}>
                         {c.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+               <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="invoice" className="text-right">
+                  Invoice
+                </Label>
+                <Select>
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue placeholder="Select an invoice" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {invoices.map((i) => (
+                      <SelectItem key={i.id} value={i.id}>
+                        {i.invoiceNumber} - {customers.find(c => c.id === i.customerId)?.name}
                       </SelectItem>
                     ))}
                   </SelectContent>

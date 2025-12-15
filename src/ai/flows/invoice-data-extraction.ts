@@ -32,6 +32,7 @@ const InvoiceItemSchema = z.object({
 const InvoiceDataExtractionOutputSchema = z.object({
   invoiceNumber: z.string().optional().describe('The invoice number.'),
   customerName: z.string().describe('The name of the customer or entity being billed.'),
+  customerPhone: z.string().optional().describe("The customer's phone number."),
   date: z.string().describe('The invoice date.'),
   aadhaarNumber: z.string().optional().describe('The Aadhaar number of the customer.'),
   items: z.array(InvoiceItemSchema).describe('A list of line items from the invoice.'),
@@ -55,6 +56,7 @@ const invoiceDataExtractionPrompt = ai.definePrompt({
   Please extract the following fields:
   - **invoiceNumber**: The unique identifier for the invoice. Look for labels like "Invoice No.".
   - **customerName**: The name of the person or company being billed. Pay close attention to text under the labels 'Bill To' or 'Ship To'. This is the recipient of the invoice.
+  - **customerPhone**: The phone number of the customer. Look for labels like "Phone", "Mobile", or contact information near the customer's name.
   - **date**: The date the invoice was issued. Look for "Invoice Date".
   - **aadhaarNumber**: The Aadhaar number of the customer, if present.
   - **items**: A list of all line items. Each item should have a 'name', 'quantity', 'price', and 'total'.
