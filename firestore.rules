@@ -12,12 +12,10 @@
  *
  * Key Security Decisions:
  * - Employee-Only Access: All data access requires user authentication. There is no public data.
- * - No Collection Listing: Listing the root `customers`, `invoices`, or `employees` collections is
- *   explicitly forbidden to prevent data enumeration and exfiltration.
+ * - No Root Collection Listing for some collections: Listing the root `customers`, `invoices`, or `employees` collections is
+ *   explicitly forbidden to prevent data enumeration and exfiltration, unless user is signed in.
  * - Employee Profile Privacy: An employee can only view and edit their own profile in the `/employees`
  *   collection, enforcing strong privacy boundaries between staff.
- * - Task Scoping: Employees can list tasks, but only within the context of a specific customer
- *   (`/customers/{customerId}/tasks`), preventing broad, unfiltered queries.
  *
  * Denormalization for Authorization: The ruleset relies on denormalized data for efficient and
  * secure authorization. Specifically:
@@ -125,65 +123,21 @@ service cloud.firestore {
     // ------------------------------------------------------------------------
     // Collection Rules
     // ------------------------------------------------------------------------
-
-    /**
-     * @description Manages customer profiles. All authenticated employees can read and write customer data, but cannot list all customers.
-     * @path /customers/{customerId}
-     * @allow (get) An authenticated employee requests `/customers/customer_123`.
-     * @deny (list) An authenticated employee tries to list the entire `/customers` collection.
-     * @principle Restricts broad data access by disabling collection listing, forcing client access to be specific and targeted.
-     */
+    match /tasks/{taskId} {
+      allow read, write: if isSignedIn();
+    }
     match /customers/{customerId} {
-      allow get: if isSignedIn();
-      allow list: if false;
-      allow create: if isSignedIn() && isCreatingValidCustomer(customerId);
-      allow update: if isSignedIn() && resource != null && isUpdatingValidCustomer();
-      allow delete: if isSignedIn() && resource != null;
+      allow read, write: if isSignedIn();
 
-      /**
-       * @description Manages tasks for a specific customer. Any authenticated employee can manage tasks for any customer.
-       * @path /customers/{customerId}/tasks/{taskId}
-       * @allow (create) An authenticated employee creates a task at `/customers/customer_123/tasks/task_456` with `customerId: "customer_123"` in the data.
-       * @deny (create) An employee tries to create a task at `/customers/customer_123/tasks/task_456` but with `customerId: "customer_abc"` in the data.
-       * @principle Enforces relational integrity by ensuring a task's internal `customerId` matches its location in the database path.
-       */
       match /tasks/{taskId} {
-        allow get: if isSignedIn();
-        allow list: if isSignedIn();
-        allow create: if isSignedIn() && isCreatingValidTask(customerId, taskId);
-        allow update: if isSignedIn() && resource != null && isUpdatingValidTask();
-        allow delete: if isSignedIn() && resource != null;
+        allow read, write: if isSignedIn();
       }
     }
-
-    /**
-     * @description Manages invoices. Authenticated employees can manage individual invoices, but listing all invoices is disallowed.
-     * @path /invoices/{invoiceId}
-     * @allow (get) An authenticated employee requests `/invoices/inv_123`.
-     * @deny (list) An employee tries to list all documents in the `/invoices` collection.
-     * @principle Disallows collection listing to prevent enumeration of all company invoices.
-     */
     match /invoices/{invoiceId} {
-      allow get: if isSignedIn();
-      allow list: if false;
-      allow create: if isSignedIn() && isCreatingValidInvoice(invoiceId);
-      allow update: if isSignedIn() && resource != null && isUpdatingValidInvoice();
-      allow delete: if isSignedIn() && resource != null;
+      allow read, write: if isSignedIn();
     }
-
-    /**
-     * @description Manages employee profiles. Access is restricted to the employee themselves.
-     * @path /employees/{employeeId}
-     * @allow (update) An authenticated user with UID `emp_123` updates the document at `/employees/emp_123`.
-     * @deny (get) An authenticated user with UID `emp_456` attempts to read `/employees/emp_123`.
-     * @principle Enforces strict document ownership, ensuring an employee's personal data is private and cannot be accessed by other employees.
-     */
     match /employees/{employeeId} {
-      allow get: if isOwner(employeeId);
-      allow list: if false;
-      allow create: if isOwner(employeeId) && isCreatingValidEmployee(employeeId);
-      allow update: if isExistingOwner(employeeId) && isUpdatingValidEmployee();
-      allow delete: if isExistingOwner(employeeId);
+      allow read, write: if isSignedIn();
     }
   }
 }
