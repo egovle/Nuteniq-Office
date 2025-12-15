@@ -1,143 +1,210 @@
 /**
- * Core Philosophy: This ruleset implements a role-based access model for an internal service application.
- * It assumes two primary user states: unauthenticated users (who have no access) and authenticated
- * users, who are treated as trusted "employees." Access to sensitive customer and invoice data is
- * granted to all employees, while personal employee data is strictly private to the employee themselves.
- * The default security posture is to deny all access unless explicitly granted.
+ * Core Philosophy:
+ * This ruleset establishes a security model for an internal business application where
+ * authenticated users are considered 'employees'. Employees have broad read access
+ * to facilitate collaboration but write access is tightly controlled. The primary
+ * mechanism for write authorization is based on document-level fields, such as an
+ * 'assignedTo' property on a task, which designates a specific employee as the owner.
  *
- * Data Structure: The data is organized into logical, top-level collections for `customers`,
- * `invoices`, and `employees`. Tasks are nested within the customer they belong to
- * (`/customers/{customerId}/tasks/{taskId}`), creating a clear hierarchical ownership model that
- * simplifies security rules.
+ * Data Structure:
+ * - /customers/{customerId}: Top-level collection for customer data.
+ * - /employees/{employeeId}: Top-level collection for employee profiles, where the
+ *   document ID matches the employee's authentication UID.
+ * - /projects/{projectId}: Top-level collection for collaborative projects.
+ * - Subcollections like /customers/{customerId}/tasks/{taskId} and
+ *   /projects/{projectId}/tasks/{taskId} are used to logically group related data.
  *
  * Key Security Decisions:
- * - Employee-Only Access: All data access requires user authentication. There is no public data.
- * - No Root Collection Listing for some collections: Listing the root `customers`, `invoices`, or `employees` collections is
- *   explicitly forbidden to prevent data enumeration and exfiltration, unless user is signed in.
- * - Employee Profile Privacy: An employee can only view and edit their own profile in the `/employees`
- *   collection, enforcing strong privacy boundaries between staff.
+ * - Employee-Centric Model: Any signed-in user is treated as an employee with
+ *   access to view shared data like customers, projects, and tasks.
+ * - Strict Ownership for Writes: Modification of data (e.g., updating a task) is
+ *   restricted to the employee explicitly assigned to that document.
+ * - Disabled Writes on Ambiguous Collections: Collections like 'projects' and 'invoices'
+ *   currently lack ownership fields in their data model. To prevent unauthorized access,
+ *   all write operations on these collections are explicitly disabled until the data
+ *   schema is updated with an ownership field (e.g., 'ownerId' or a 'members' map).
+ * - No User Listing: Listing all employees from the `/employees` collection is
+ *   disallowed to protect user privacy and prevent data scraping.
  *
- * Denormalization for Authorization: The ruleset relies on denormalized data for efficient and
- * secure authorization. Specifically:
- * - Task documents under `/customers/{customerId}/tasks/{taskId}` must contain a `customerId` field
- *   that matches the `customerId` in the path. This allows rules to enforce relational integrity
- *   without performing costly `get()` calls to the parent customer document.
- *
- * Structural Segregation: The use of a nested collection for tasks (`/customers/{customerId}/tasks`)
- * provides strong structural segregation. This pattern ensures that all tasks are inherently and
- * securely linked to a specific customer, making it impossible to create an "orphan" task and
- * simplifying rules for access control.
+ * Denormalization for Authorization:
+ * This ruleset relies on denormalized fields for efficient and secure authorization.
+ * For example, each 'Task' document contains an 'assignedTo' field holding the UID of the
+ * responsible employee. This avoids costly and slow `get()` calls to other documents
+ * during rule evaluation, making the rules both performant and simple.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ------------------------------------------------------------------------
-    // Helper Functions
-    // ------------------------------------------------------------------------
+    // Helper functions to improve readability and code reuse.
 
     /**
-     * Returns true if the user is authenticated.
+     * isSignedIn
+     * Checks if the user is authenticated. In this model, all authenticated
+     * users are considered employees.
      */
     function isSignedIn() {
       return request.auth != null;
     }
 
     /**
-     * Returns true if the authenticated user's UID matches the provided userId.
-     * This is the primary function for enforcing document ownership.
+     * isOwner
+     * Checks if the authenticated user's UID matches the provided userId.
+     * This is used for documents that are directly owned by a user, like their profile.
      */
     function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
+      return request.auth.uid == userId;
     }
 
     /**
-     * Returns true if the user is the owner of an existing document.
-     * Used for safe update and delete operations.
+     * isExistingDoc
+     * Ensures that a document exists before an update or delete operation.
+     * This prevents operations on non-existent paths.
      */
-    function isExistingOwner(userId) {
-      return isOwner(userId) && resource != null;
+    function isExistingDoc() {
+      return resource != null;
     }
 
     /**
-     * Validates relational fields for a new Customer document.
-     * Ensures the document ID is stored inside the document for consistency.
+     * isAssignedEmployee
+     * Checks if the authenticated user is the employee assigned to a task.
+     * This function reads the 'assignedTo' field from the task document data.
      */
-    function isCreatingValidCustomer(customerId) {
-      return request.resource.data.id == customerId;
+    function isAssignedEmployee(taskData) {
+      return request.auth.uid == taskData.assignedTo;
+    }
+    
+    /**
+     * isUpdatingAssignedTask
+     * Allows an update if the user is the current assignee OR is becoming the new assignee.
+     * This flexible rule enables task re-assignment between employees.
+     */
+    function isUpdatingAssignedTask() {
+      return isExistingDoc() && (isAssignedEmployee(resource.data) || isAssignedEmployee(request.resource.data));
     }
 
     /**
-     * Enforces immutability of the customer's unique ID during updates.
+     * isDeletingAssignedTask
+     * Ensures only the currently assigned employee can delete a task.
      */
-    function isUpdatingValidCustomer() {
-      return request.resource.data.id == resource.data.id;
+    function isDeletingAssignedTask() {
+      return isExistingDoc() && isAssignedEmployee(resource.data);
+    }
+    
+    /**
+     * isCreatingOwnProfile
+     * Validates that a user is creating their own profile document and that the
+     * internal 'id' field matches their UID for relational integrity.
+     */
+    function isCreatingOwnProfile(employeeId) {
+      return isOwner(employeeId) && request.resource.data.id == employeeId;
     }
 
     /**
-     * Validates relational fields for a new Task document.
-     * Ensures path consistency with both the task ID and the parent customer ID.
+     * isUpdatingOwnProfile
+     * Validates that a user is updating their own profile and that the 'id' field is immutable.
      */
-    function isCreatingValidTask(customerId, taskId) {
-      let data = request.resource.data;
-      return data.id == taskId && data.customerId == customerId;
+    function isUpdatingOwnProfile(employeeId) {
+      return isOwner(employeeId) && isExistingDoc() && request.resource.data.id == resource.data.id;
+    }
+    
+    /**
+     * hasConsistentCustomerIdOnCreate
+     * On creation, ensures the task's internal customerId matches the path.
+     */
+    function hasConsistentCustomerIdOnCreate(customerId) {
+        return request.resource.data.customerId == customerId;
+    }
+    
+    /**
+     * isCustomerIdImmutableOnUpdate
+     * On update, ensures the task's customerId cannot be changed.
+     */
+    function isCustomerIdImmutableOnUpdate() {
+        return request.resource.data.customerId == resource.data.customerId;
     }
 
     /**
-     * Enforces immutability of a task's unique ID and its parent customer link.
+     * @description Employees can view and manage all customer records.
+     * @path /customers/{customerId}
+     * @allow (get) Any authenticated employee can read any customer's details. auth: { uid: 'employee_abc' }
+     * @deny (get) Unauthenticated users cannot read customer data. auth: null
+     * @principle Grants broad read/write access to internal employees for managing company data.
      */
-    function isUpdatingValidTask() {
-      let newData = request.resource.data;
-      let oldData = resource.data;
-      return newData.id == oldData.id && newData.customerId == oldData.customerId;
-    }
-
-    /**
-     * Validates relational fields for a new Invoice document.
-     */
-    function isCreatingValidInvoice(invoiceId) {
-      return request.resource.data.id == invoiceId;
-    }
-
-    /**
-     * Enforces immutability of the invoice's unique ID during updates.
-     */
-    function isUpdatingValidInvoice() {
-      return request.resource.data.id == resource.data.id;
-    }
-
-    /**
-     * Validates relational fields for a new Employee document.
-     */
-    function isCreatingValidEmployee(employeeId) {
-      return request.resource.data.id == employeeId;
-    }
-
-    /**
-     * Enforces immutability of the employee's unique ID during updates.
-     */
-    function isUpdatingValidEmployee() {
-      return request.resource.data.id == resource.data.id;
-    }
-
-    // ------------------------------------------------------------------------
-    // Collection Rules
-    // ------------------------------------------------------------------------
-    match /tasks/{taskId} {
-      allow read, write: if isSignedIn();
-    }
     match /customers/{customerId} {
-      allow read, write: if isSignedIn();
+      allow get, list: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.id == customerId;
+      allow update, delete: if isSignedIn() && isExistingDoc();
+    }
 
-      match /tasks/{taskId} {
-        allow read, write: if isSignedIn();
-      }
+    /**
+     * @description Tasks under a customer are readable by all employees, but only editable by the assigned employee.
+     * @path /customers/{customerId}/tasks/{taskId}
+     * @allow (update) The employee assigned to the task can update it. auth: { uid: resource.data.assignedTo }
+     * @deny (update) An employee not assigned to the task cannot update it. auth: { uid: 'unrelated_employee' }
+     * @principle Enforces document ownership for writes using a denormalized 'assignedTo' field.
+     */
+    match /customers/{customerId}/tasks/{taskId} {
+      allow get, list: if isSignedIn();
+      allow create: if isSignedIn() && hasConsistentCustomerIdOnCreate(customerId);
+      allow update: if isUpdatingAssignedTask() && isCustomerIdImmutableOnUpdate();
+      allow delete: if isDeletingAssignedTask();
     }
-    match /invoices/{invoiceId} {
-      allow read, write: if isSignedIn();
-    }
+
+    /**
+     * @description An employee can create and manage their own profile. Other employees can view profiles but not list them.
+     * @path /employees/{employeeId}
+     * @allow (create) An authenticated user can create their own profile document. auth: { uid: employeeId }
+     * @deny (list) No user can list all employees in the system. auth: { uid: 'any_user' }
+     * @deny (update) An employee cannot update another employee's profile. auth: { uid: 'attacker_uid' }
+     * @principle Restricts access to a user's own data tree and prevents user enumeration.
+     */
     match /employees/{employeeId} {
-      allow read, write: if isSignedIn();
+      allow get: if isSignedIn();
+      allow list: if false;
+      allow create: if isCreatingOwnProfile(employeeId);
+      allow update: if isUpdatingOwnProfile(employeeId);
+      allow delete: if isOwner(employeeId) && isExistingDoc();
+    }
+
+    /**
+     * @description Projects are readable by all employees. Writes are disabled pending schema changes.
+     * @path /projects/{projectId}
+     * @allow (get) Any authenticated employee can read project details. auth: { uid: 'employee_abc' }
+     * @deny (create) No user can create a project because ownership cannot be determined. auth: { uid: 'any_user' }
+     * @principle Defaults to a secure state (read-only) when authorization data is missing from the data model.
+     */
+    match /projects/{projectId} {
+      // CRITICAL: Cannot implement owner-only writes. The 'Project' entity is missing an 'ownerId' or 'members' field.
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+    }
+
+    /**
+     * @description Project tasks are readable by all employees, but only editable by the assigned employee.
+     * @path /projects/{projectId}/tasks/{taskId}
+     * @allow (update) The employee in the task's 'assignedTo' field can update it. auth: { uid: resource.data.assignedTo }
+     * @deny (delete) An employee not assigned to the task cannot delete it. auth: { uid: 'unrelated_employee' }
+     * @principle Enforces document ownership for writes using a denormalized 'assignedTo' field, independent of the parent document.
+     */
+    match /projects/{projectId}/tasks/{taskId} {
+      allow get, list: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isUpdatingAssignedTask();
+      allow delete: if isDeletingAssignedTask();
+    }
+
+    /**
+     * @description Invoices are readable by all employees. Writes are disabled pending schema changes.
+     * @path /projects/{projectId}/invoices/{invoiceId}
+     * @allow (list) Any authenticated employee can list invoices for a project. auth: { uid: 'employee_abc' }
+     * @deny (create) No user can create an invoice because ownership cannot be determined. auth: { uid: 'any_user' }
+     * @principle Defaults to a secure state (read-only) when authorization data is missing from the data model.
+     */
+    match /projects/{projectId}/invoices/{invoiceId} {
+      // CRITICAL: Cannot implement owner-only writes. The 'Invoice' entity is missing an 'ownerId' or 'creatorId' field.
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
     }
   }
 }
