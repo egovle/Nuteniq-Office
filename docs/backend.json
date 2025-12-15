@@ -1,5 +1,51 @@
 {
   "entities": {
+    "Task": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Task",
+      "type": "object",
+      "description": "Represents a task within the ServiceFlow application.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Task entity."
+        },
+        "customerId": {
+          "type": "string",
+          "description": "Reference to Customer. (Relationship: Customer 1:N Task)"
+        },
+        "assigneeId": {
+          "type": "string",
+          "description": "Reference to StaffMember. (Relationship: StaffMember 1:N Task)"
+        },
+        "priority": {
+          "type": "string",
+          "description": "The priority level of the task (High, Medium, Low).",
+          "format": "string"
+        },
+        "creationDate": {
+          "type": "string",
+          "description": "The date when the task was created.",
+          "format": "date-time"
+        },
+        "resolutionDate": {
+          "type": "string",
+          "description": "The date when the task was resolved.",
+          "format": "date-time"
+        },
+        "description": {
+          "type": "string",
+          "description": "A description of the task."
+        }
+      },
+      "required": [
+        "id",
+        "customerId",
+        "assigneeId",
+        "priority",
+        "creationDate"
+      ]
+    },
     "Customer": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Customer",
@@ -10,21 +56,21 @@
           "type": "string",
           "description": "Unique identifier for the Customer entity."
         },
+        "name": {
+          "type": "string",
+          "description": "The name of the customer."
+        },
         "aadhaarNumber": {
           "type": "string",
-          "description": "Aadhaar number of the customer (encrypted)."
+          "description": "The Aadhaar number of the customer (encrypted)."
         },
         "panNumber": {
           "type": "string",
-          "description": "PAN number of the customer (encrypted)."
+          "description": "The PAN number of the customer (encrypted)."
         },
         "passportDetails": {
           "type": "string",
-          "description": "Passport details of the customer (encrypted)."
-        },
-        "name": {
-          "type": "string",
-          "description": "Name of the customer."
+          "description": "The passport details of the customer (encrypted)."
         }
       },
       "required": [
@@ -32,56 +78,11 @@
         "name"
       ]
     },
-    "Task": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "Task",
-      "type": "object",
-      "description": "Represents a task to be performed.",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the Task entity."
-        },
-        "customerId": {
-          "type": "string",
-          "description": "Reference to Customer. (Relationship: Customer 1:N Task)"
-        },
-        "assignedTo": {
-          "type": "string",
-          "description": "Reference to Employee. (Relationship: Employee 1:N Task).  Staff member assigned to the task."
-        },
-        "priority": {
-          "type": "string",
-          "description": "Priority level of the task (High, Medium, Low)."
-        },
-        "creationDate": {
-          "type": "string",
-          "description": "Date the task was created.",
-          "format": "date-time"
-        },
-        "resolutionDate": {
-          "type": "string",
-          "description": "Date the task was resolved.",
-          "format": "date-time"
-        },
-        "description": {
-          "type": "string",
-          "description": "Description of the task."
-        }
-      },
-      "required": [
-        "id",
-        "customerId",
-        "assignedTo",
-        "priority",
-        "creationDate"
-      ]
-    },
     "Invoice": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Invoice",
       "type": "object",
-      "description": "Represents an invoice.",
+      "description": "Represents an invoice uploaded to the system.",
       "properties": {
         "id": {
           "type": "string",
@@ -89,20 +90,20 @@
         },
         "invoiceNumber": {
           "type": "string",
-          "description": "Invoice number."
+          "description": "The invoice number."
         },
         "customerName": {
           "type": "string",
-          "description": "Name of the customer on the invoice."
+          "description": "The name of the customer associated with the invoice."
         },
         "date": {
           "type": "string",
-          "description": "Date of the invoice.",
+          "description": "The date of the invoice.",
           "format": "date-time"
         },
         "aadhaarNumber": {
           "type": "string",
-          "description": "Aadhaar number extracted from the invoice (if available)."
+          "description": "The Aadhaar number extracted from the invoice (optional)."
         }
       },
       "required": [
@@ -111,70 +112,34 @@
         "date"
       ]
     },
-    "Employee": {
+    "StaffMember": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "Employee",
+      "title": "StaffMember",
       "type": "object",
-      "description": "Represents an employee account.",
+      "description": "Represents a staff member account.",
       "properties": {
         "id": {
           "type": "string",
-          "description": "Unique identifier for the Employee entity."
+          "description": "Unique identifier for the StaffMember entity."
         },
         "name": {
           "type": "string",
-          "description": "Name of the employee."
-        },
-        "email": {
-          "type": "string",
-          "description": "Email address of the employee.",
-          "format": "email"
+          "description": "The name of the staff member."
         },
         "skills": {
           "type": "array",
-          "description": "Skills possessed by the employee.",
-          "items": {
-            "type": "string"
-          }
-        }
-      },
-      "required": [
-        "id",
-        "name",
-        "email"
-      ]
-    },
-    "Project": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "Project",
-      "type": "object",
-      "description": "Represents a project and allows grouping of tasks and invoices.",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the Project entity."
-        },
-        "name": {
-          "type": "string",
-          "description": "Name of the project."
-        },
-        "description": {
-          "type": "string",
-          "description": "Description of the project."
-        },
-        "taskIds": {
-          "type": "array",
-          "description": "References to Tasks. (Relationship: Project 1:N Task)",
+          "description": "An array of strings representing the skills of the staff member.",
           "items": {
             "type": "string"
           }
         },
-        "invoiceIds": {
-          "type": "array",
-          "description": "References to Invoices. (Relationship: Project 1:N Invoice)",
-          "items": {
-            "type": "string"
-          }
+        "workload": {
+          "type": "number",
+          "description": "The current workload of the staff member."
+        },
+        "availability": {
+          "type": "boolean",
+          "description": "Indicates whether the staff member is currently available."
         }
       },
       "required": [
@@ -198,7 +163,7 @@
           "schema": {
             "$ref": "#/backend/entities/Customer"
           },
-          "description": "Stores customer profiles.  Customer `id` is used as the document ID.",
+          "description": "Stores customer profiles. Path-based ownership to control access to customer data.",
           "params": [
             {
               "name": "customerId",
@@ -208,34 +173,14 @@
         }
       },
       {
-        "path": "/employees/{employeeId}",
-        "definition": {
-          "entityName": "Employee",
-          "schema": {
-            "$ref": "#/backend/entities/Employee"
-          },
-          "description": "Stores employee profiles. Employee `id` is used as the document ID.",
-          "params": [
-            {
-              "name": "employeeId",
-              "description": "The unique identifier of the employee."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/customers/{customerId}/tasks/{taskId}",
+        "path": "/tasks/{taskId}",
         "definition": {
           "entityName": "Task",
           "schema": {
             "$ref": "#/backend/entities/Task"
           },
-          "description": "Stores tasks associated with a customer. Includes denormalized `customerId` and `assignedTo` for authorization independence. Task `id` is used as the document ID.",
+          "description": "Stores tasks. Includes `customerId` and `assigneeId` for access control.",
           "params": [
-            {
-              "name": "customerId",
-              "description": "The unique identifier of the customer."
-            },
             {
               "name": "taskId",
               "description": "The unique identifier of the task."
@@ -244,62 +189,54 @@
         }
       },
       {
-        "path": "/projects/{projectId}",
+        "path": "/staff_members/{staffMemberId}",
         "definition": {
-          "entityName": "Project",
+          "entityName": "StaffMember",
           "schema": {
-            "$ref": "#/backend/entities/Project"
+            "$ref": "#/backend/entities/StaffMember"
           },
-          "description": "Stores project details. Project `id` is used as the document ID.",
+          "description": "Stores staff member profiles. Admin access is controlled via /roles_admin/{uid}.",
           "params": [
             {
-              "name": "projectId",
-              "description": "The unique identifier of the project."
+              "name": "staffMemberId",
+              "description": "The unique identifier of the staff member."
             }
           ]
         }
       },
       {
-        "path": "/projects/{projectId}/tasks/{taskId}",
-        "definition": {
-          "entityName": "Task",
-          "schema": {
-            "$ref": "#/backend/entities/Task"
-          },
-          "description": "Stores tasks associated with a project. Includes denormalized `customerId` and `assignedTo` for authorization independence.  Task `id` is used as the document ID.",
-          "params": [
-            {
-              "name": "projectId",
-              "description": "The unique identifier of the project."
-            },
-            {
-              "name": "taskId",
-              "description": "The unique identifier of the task."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/projects/{projectId}/invoices/{invoiceId}",
+        "path": "/invoices/{invoiceId}",
         "definition": {
           "entityName": "Invoice",
           "schema": {
             "$ref": "#/backend/entities/Invoice"
           },
-          "description": "Stores invoices associated with a project. Invoice `id` is used as the document ID.",
+          "description": "Stores invoices. Accessible by authorized users. Includes `customerName` to link to customer data.",
           "params": [
-            {
-              "name": "projectId",
-              "description": "The unique identifier of the project."
-            },
             {
               "name": "invoiceId",
               "description": "The unique identifier of the invoice."
             }
           ]
         }
+      },
+      {
+        "path": "/roles_admin/{userId}",
+        "definition": {
+          "entityName": "roles_admin",
+          "schema": {
+            "$ref": "#/backend/entities/StaffMember"
+          },
+          "description": "Marks a user as an administrator. Existence of document grants admin privileges.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user who is an admin."
+            }
+          ]
+        }
       }
     ],
-    "reasoning": "The Firestore structure is designed to ensure Authorization Independence, support required QAPs (Queries are not Filters), and maintain data integrity. It leverages structural segregation and explicit access modeling. Since projects are top-level entities, they are stored in a root collection. Customers have a 1:N relationship with tasks, so tasks are stored in a subcollection. Similarly, Projects have a 1:N relationship with tasks, so tasks are stored in a subcollection.  For Authorization Independence, the `customerId` and `assignedTo` fields on `Task` documents eliminate the need for `get()` calls to `Customer` or `Employee` documents.  The structure separates concerns, placing user-owned resources under their respective user documents and collaborative resources in top-level collections."
+    "reasoning": "The Firestore data structure is designed to support the ServiceFlow application's features while adhering to the principles of Authorization Independence, Structural Segregation, and Access Modeling. Task, Customer, Invoice, and StaffMember entities are organized into collections that facilitate secure and scalable data management. The structure prioritizes path-based ownership for user-related data and uses a membership map strategy where applicable. \n\nAuthorization Independence is achieved by denormalizing authorization-related data where needed. For instance, if access to Tasks needed to be restricted based on customer attributes, these attributes would be copied into the Task documents. Currently, the structure assumes direct ownership based on the `customerId` and `assigneeId`, enabling simple rules based on `request.auth.uid`.\n\nStructural Segregation ensures that collections contain documents with similar security needs. This approach simplifies security rules. Private customer data is stored in a way that ensures only authorized staff members can access it. Task assignments link staff members and customers, controlling access based on these relationships.\n\nQAPs are supported through structural segregation and membership models. List operations are secured by ensuring that rules can be applied at the collection level without needing to filter data based on document content.\n\nInvariants such as ownership and timestamps are enforced through the data structure and can be further enforced with Firebase Functions triggered on data changes. The use of explicit state modeling and predictable schema contributes to maintainability and debuggability."
   }
 }
