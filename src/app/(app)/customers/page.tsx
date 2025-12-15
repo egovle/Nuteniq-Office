@@ -3,12 +3,16 @@
 import * as React from "react";
 import {
   DotsHorizontalIcon,
+  ChevronDownIcon,
+  ChevronRightIcon
 } from "@radix-ui/react-icons";
 import {
   ColumnDef,
   flexRender,
   getCoreRowModel,
+  getExpandedRowModel,
   useReactTable,
+  Row,
 } from "@tanstack/react-table";
 
 import { Button } from "@/components/ui/button";
@@ -40,7 +44,7 @@ import {
   DialogClose,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { customers, type Customer } from "@/lib/data";
+import { customers, invoices, type Customer, type InvoiceItem } from "@/lib/data";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { PlaceHolderImages } from "@/lib/placeholder-images";
 import Image from "next/image";
@@ -50,7 +54,62 @@ const data: Customer[] = customers;
 const getImage = (id: string) =>
   PlaceHolderImages.find((img) => img.id === id);
 
+const getCustomerServices = (customerId: string): InvoiceItem[] => {
+    return invoices
+        .filter(invoice => invoice.customerId === customerId)
+        .flatMap(invoice => invoice.items);
+}
+
+const ServicesSubTable = ({ row }: { row: Row<Customer> }) => {
+    const services = getCustomerServices(row.original.id);
+
+    if (!services.length) {
+        return <div className="px-4 py-2 text-sm text-muted-foreground">No services found for this customer.</div>
+    }
+
+    return (
+        <div className="p-2 bg-muted/50">
+            <Table>
+                <TableHeader>
+                    <TableRow>
+                        <TableHead>Service/Item</TableHead>
+                        <TableHead className="text-right">Quantity</TableHead>
+                        <TableHead className="text-right">Price</TableHead>
+                        <TableHead className="text-right">Total</TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    {services.map((item, index) => (
+                        <TableRow key={index}>
+                            <TableCell>{item.name}</TableCell>
+                            <TableCell className="text-right">{item.quantity}</TableCell>
+                            <TableCell className="text-right">₹{item.price.toFixed(2)}</TableCell>
+                            <TableCell className="text-right">₹{item.total.toFixed(2)}</TableCell>
+                        </TableRow>
+                    ))}
+                </TableBody>
+            </Table>
+        </div>
+    )
+}
+
 export const columns: ColumnDef<Customer>[] = [
+    {
+    id: 'expander',
+    header: () => null,
+    cell: ({ row }) => {
+      return row.getCanExpand() ? (
+        <button
+          {...{
+            onClick: row.getToggleExpandedHandler(),
+            style: { cursor: 'pointer' },
+          }}
+        >
+          {row.getIsExpanded() ? <ChevronDownIcon /> : <ChevronRightIcon />}
+        </button>
+      ) : null
+    },
+  },
   {
     accessorKey: "name",
     header: "Name",
@@ -172,6 +231,8 @@ export default function CustomersPage() {
     data,
     columns,
     getCoreRowModel: getCoreRowModel(),
+    getExpandedRowModel: getExpandedRowModel(),
+    getRowCanExpand: () => true,
   });
 
   return (
@@ -252,8 +313,8 @@ export default function CustomersPage() {
           <TableBody>
             {table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row) => (
+                <React.Fragment key={row.id}>
                 <TableRow
-                  key={row.id}
                   data-state={row.getIsSelected() && "selected"}
                 >
                   {row.getVisibleCells().map((cell) => (
@@ -265,6 +326,14 @@ export default function CustomersPage() {
                     </TableCell>
                   ))}
                 </TableRow>
+                {row.getIsExpanded() && (
+                    <TableRow>
+                        <TableCell colSpan={columns.length}>
+                            <ServicesSubTable row={row} />
+                        </TableCell>
+                    </TableRow>
+                )}
+                </React.Fragment>
               ))
             ) : (
               <TableRow>
