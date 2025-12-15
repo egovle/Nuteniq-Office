@@ -51,7 +51,7 @@ import { PlaceHolderImages } from "@/lib/placeholder-images";
 import Image from "next/image";
 import { Badge } from "@/components/ui/badge";
 import { useCollection, useFirebase, useMemoFirebase } from "@/firebase";
-import { collection, doc } from "firebase/firestore";
+import { collection, doc, query, where } from "firebase/firestore";
 import { addDocumentNonBlocking, setDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 
 const getImage = (id: string) =>
@@ -62,18 +62,16 @@ const ServicesSubTable = ({ row }: { row: Row<Customer> }) => {
     const customerId = row.original.id;
 
     const invoicesQuery = useMemoFirebase(() => {
-        if (!firestore) return null;
-        return collection(firestore, 'invoices');
-    }, [firestore]);
+        if (!firestore || !customerId) return null;
+        return query(collection(firestore, 'invoices'), where('customerId', '==', customerId));
+    }, [firestore, customerId]);
 
     const { data: invoices, isLoading } = useCollection(invoicesQuery);
 
     const services = React.useMemo(() => {
         if (!invoices) return [];
-        return invoices
-            .filter(invoice => invoice.customerId === customerId)
-            .flatMap(invoice => invoice.items as InvoiceItem[]);
-    }, [invoices, customerId]);
+        return invoices.flatMap(invoice => invoice.items as InvoiceItem[]);
+    }, [invoices]);
 
 
     if (isLoading) {
