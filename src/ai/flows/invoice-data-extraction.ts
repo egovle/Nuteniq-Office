@@ -32,7 +32,7 @@ const InvoiceItemSchema = z.object({
 
 const InvoiceDataExtractionOutputSchema = z.object({
   invoiceNumber: z.string().optional().describe('The invoice number.'),
-  customerName: z.string().describe('The name of the customer.'),
+  customerName: z.string().describe('The name of the customer or entity being billed.'),
   date: z.string().describe('The invoice date.'),
   aadhaarNumber: z.string().optional().describe('The Aadhaar number of the customer.'),
   items: z.array(InvoiceItemSchema).describe('A list of line items from the invoice.'),
@@ -49,19 +49,18 @@ const invoiceDataExtractionPrompt = ai.definePrompt({
   name: 'invoiceDataExtractionPrompt',
   input: {schema: InvoiceDataExtractionInputSchema},
   output: {schema: InvoiceDataExtractionOutputSchema},
-  prompt: `You are an expert data extraction specialist.
-  Extract the following information from the invoice provided.
-  The invoice will be passed to you as a data URI. The image is of type {{{media url=invoiceDataUri}}}
+  prompt: `You are an expert data extraction specialist. Your task is to accurately extract information from the provided invoice image.
 
-  The following fields are extracted:
-  - invoiceNumber: The invoice number.
-  - customerName: The name of the customer.
-  - date: The invoice date.
-  - aadhaarNumber: The Aadhaar number of the customer.
-  - items: A list of all line items in the invoice, each with a name, quantity, price, and total.
+  The invoice image is provided as a data URI: {{{media url=invoiceDataUri}}}
 
-  If a field is not present, leave it blank.
-  Ensure the output is valid JSON.`,
+  Please extract the following fields:
+  - **invoiceNumber**: The unique identifier for the invoice.
+  - **customerName**: The name of the person or company being billed. This is often labeled as 'Bill To', 'To', or is the most prominent name that isn't the sender.
+  - **date**: The date the invoice was issued.
+  - **aadhaarNumber**: The Aadhaar number of the customer, if present.
+  - **items**: A list of all line items. Each item should have a 'name', 'quantity', 'price', and 'total'.
+
+  If any field is not present on the invoice, please leave it blank. Ensure the final output is valid JSON.`,
 });
 
 const invoiceDataExtractionFlow = ai.defineFlow(
