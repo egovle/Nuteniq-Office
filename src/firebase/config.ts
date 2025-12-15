@@ -1,9 +1,10 @@
 
 export const firebaseConfig = {
-  "projectId": "nuteniq-office",
-  "appId": "1:564582835590:web:d7a8d3de4d5f22e3e9c5a1",
-  "apiKey": "REPLACE_WITH_YOUR_API_KEY",
-  "authDomain": "nuteniq-office.firebaseapp.com",
-  "measurementId": "G-XXXXXXXXXX",
-  "messagingSenderId": "564582835590"
+  apiKey: "AIzaSyBvlz7XQgoyNwl6m4a3crAYFzyBuxIe6Oc",
+  authDomain: "nuteniq-office.firebaseapp.com",
+  projectId: "nuteniq-office",
+  storageBucket: "nuteniq-office.appspot.com",
+  messagingSenderId: "1045359649998",
+  appId: "1:1045359649998:web:0a4d0ed7f0d544d8465c9f",
+  measurementId: "G-M5XT1VNJ1D"
 };
