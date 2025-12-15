@@ -19,24 +19,11 @@ import {
   CardTitle,
   CardDescription,
 } from "@/components/ui/card";
-import { tasks, employees } from "@/lib/data";
 import { Badge } from "@/components/ui/badge";
-
-const taskStatusData = tasks.reduce((acc, task) => {
-  const status = task.status;
-  if (!acc[status]) {
-    acc[status] = { name: status, value: 0 };
-  }
-  acc[status].value += 1;
-  return acc;
-}, {} as Record<string, { name: string; value: number }>);
-
-const taskStatusChartData = Object.values(taskStatusData);
-
-const employeeTaskData = employees.map((emp) => ({
-  name: emp.name.split(" ")[0],
-  tasks: tasks.filter((task) => task.assignee === emp.name).length,
-}));
+import { useCollection, useFirebase, useMemoFirebase } from "@/firebase";
+import { collection } from "firebase/firestore";
+import { type Task, type Employee } from "@/lib/data";
+import { useMemo } from "react";
 
 const statusColors: { [key: string]: string } = {
   Todo: "#3399FF",
@@ -46,6 +33,36 @@ const statusColors: { [key: string]: string } = {
 };
 
 export default function DashboardPage() {
+  const { firestore } = useFirebase();
+
+  const tasksQuery = useMemoFirebase(() => firestore ? collection(firestore, 'tasks') : null, [firestore]);
+  const { data: tasksData } = useCollection<Task>(tasksQuery);
+  const tasks = tasksData || [];
+
+  const employeesQuery = useMemoFirebase(() => firestore ? collection(firestore, 'employees') : null, [firestore]);
+  const { data: employeesData } = useCollection<Employee>(employeesQuery);
+  const employees = employeesData || [];
+
+  const taskStatusChartData = useMemo(() => {
+    const taskStatusData = tasks.reduce((acc, task) => {
+      const status = task.status;
+      if (!acc[status]) {
+        acc[status] = { name: status, value: 0 };
+      }
+      acc[status].value += 1;
+      return acc;
+    }, {} as Record<string, { name: string; value: number }>);
+    return Object.values(taskStatusData);
+  }, [tasks]);
+  
+  const employeeTaskData = useMemo(() => {
+    return employees.map((emp) => ({
+      name: emp.name.split(" ")[0],
+      tasks: tasks.filter((task) => task.assignee === emp.name).length,
+    }));
+  }, [employees, tasks]);
+
+
   return (
     <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
       <Card className="lg:col-span-1">

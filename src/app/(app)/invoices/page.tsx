@@ -27,9 +27,13 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { Upload } from "lucide-react";
-import { customers, invoices } from "@/lib/data";
+import { useCollection, useFirebase, useMemoFirebase } from "@/firebase";
+import { collection, doc } from "firebase/firestore";
+import { addDocumentNonBlocking } from "@/firebase/non-blocking-updates";
+import { type Customer } from "@/lib/data";
 
 export default function InvoicePage() {
+  const { firestore } = useFirebase();
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<InvoiceDataExtractionOutput | null>(
     null
@@ -37,6 +41,10 @@ export default function InvoicePage() {
   const [preview, setPreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+
+  const customersQuery = useMemoFirebase(() => firestore ? collection(firestore, 'customers') : null, [firestore]);
+  const { data: customersData } = useCollection<Customer>(customersQuery);
+  const customers = customersData || [];
 
   const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -83,18 +91,19 @@ export default function InvoicePage() {
   };
 
   const handleSaveData = () => {
-    if (!result) return;
+    if (!result || !firestore) return;
 
     let customer = customers.find(c => c.name.toLowerCase() === result.customerName.toLowerCase());
     let customerId;
 
     if (!customer) {
-      customerId = `CUS-${Date.now()}`;
-      customers.push({
+      customerId = doc(collection(firestore, 'customers')).id;
+      addDocumentNonBlocking(collection(firestore, 'customers'), {
         id: customerId,
         name: result.customerName,
         email: '',
         phone: result.customerPhone || '',
+        mobile: result.customerPhone || '',
         avatar: `avatar-${(customers.length % 6) + 1}`,
         aadhaar: result.aadhaarNumber || '',
         pan: ''
@@ -104,15 +113,15 @@ export default function InvoicePage() {
     }
     
     const newInvoice = {
-        id: `INV-${Date.now()}`,
         invoiceNumber: result.invoiceNumber,
         customerId: customerId,
         date: result.date,
         items: result.items || [],
         total: result.items?.reduce((acc, item) => acc + item.total, 0) || 0
     };
-
-    invoices.push(newInvoice);
+    
+    const newDocRef = doc(collection(firestore, 'invoices'));
+    addDocumentNonBlocking(collection(firestore, 'invoices'), { ...newInvoice, id: newDocRef.id });
 
     toast({
         title: "Data Saved!",

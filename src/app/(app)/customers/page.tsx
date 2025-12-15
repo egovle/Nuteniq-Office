@@ -45,25 +45,40 @@ import {
   DialogClose,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { customers, invoices, type Customer, type InvoiceItem } from "@/lib/data";
+import { type Customer, type InvoiceItem } from "@/lib/data";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { PlaceHolderImages } from "@/lib/placeholder-images";
 import Image from "next/image";
 import { Badge } from "@/components/ui/badge";
-
-const data: Customer[] = customers;
+import { useCollection, useFirebase, useMemoFirebase } from "@/firebase";
+import { collection, doc } from "firebase/firestore";
+import { addDocumentNonBlocking, setDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 
 const getImage = (id: string) =>
   PlaceHolderImages.find((img) => img.id === id);
 
-const getCustomerServices = (customerId: string): InvoiceItem[] => {
-    return invoices
-        .filter(invoice => invoice.customerId === customerId)
-        .flatMap(invoice => invoice.items);
-}
-
 const ServicesSubTable = ({ row }: { row: Row<Customer> }) => {
-    const services = getCustomerServices(row.original.id);
+    const { firestore } = useFirebase();
+    const customerId = row.original.id;
+
+    const invoicesQuery = useMemoFirebase(() => {
+        if (!firestore) return null;
+        return collection(firestore, 'invoices');
+    }, [firestore]);
+
+    const { data: invoices, isLoading } = useCollection(invoicesQuery);
+
+    const services = React.useMemo(() => {
+        if (!invoices) return [];
+        return invoices
+            .filter(invoice => invoice.customerId === customerId)
+            .flatMap(invoice => invoice.items as InvoiceItem[]);
+    }, [invoices, customerId]);
+
+
+    if (isLoading) {
+        return <div className="px-4 py-2 text-sm text-muted-foreground">Loading services...</div>
+    }
 
     if (!services.length) {
         return <div className="px-4 py-2 text-sm text-muted-foreground">No services found for this customer.</div>
@@ -111,64 +126,117 @@ const ServicesSubTable = ({ row }: { row: Row<Customer> }) => {
     )
 }
 
-export const columns: ColumnDef<Customer>[] = [
+export default function CustomersPage() {
+  const { firestore } = useFirebase();
+  const [globalFilter, setGlobalFilter] = React.useState('');
+  const [editingCustomer, setEditingCustomer] = React.useState<Customer | null>(null);
+
+  const customersQuery = useMemoFirebase(() => firestore ? collection(firestore, 'customers') : null, [firestore]);
+  const { data: customersData, isLoading: isLoadingCustomers } = useCollection<Customer>(customersQuery);
+
+  const invoicesQuery = useMemoFirebase(() => firestore ? collection(firestore, 'invoices') : null, [firestore]);
+  const { data: invoicesData } = useCollection(invoicesQuery);
+
+  const data = customersData || [];
+  const invoices = invoicesData || [];
+
+  const handleAddNewCustomer = (e: React.FormEvent<HTMLFormElement>) => {
+      e.preventDefault();
+      if (!firestore) return;
+      const formData = new FormData(e.currentTarget);
+      const newCustomer = {
+          name: formData.get('name') as string,
+          email: formData.get('email') as string,
+          phone: formData.get('phone') as string,
+          mobile: formData.get('mobile') as string,
+          aadhaar: formData.get('aadhaar') as string,
+          pan: formData.get('pan') as string,
+          avatar: `avatar-${(data.length % 6) + 1}`,
+      };
+      const newDocRef = doc(collection(firestore, 'customers'));
+      addDocumentNonBlocking(collection(firestore, 'customers'), { ...newCustomer, id: newDocRef.id });
+  };
+  
+  const handleUpdateCustomer = (e: React.FormEvent<HTMLFormElement>) => {
+      e.preventDefault();
+      if (!firestore || !editingCustomer) return;
+      const formData = new FormData(e.currentTarget);
+      const updatedCustomer = {
+          ...editingCustomer,
+          name: formData.get('name') as string,
+          email: formData.get('email') as string,
+          phone: formData.get('phone') as string,
+          mobile: formData.get('mobile') as string,
+          aadhaar: formData.get('aadhaar') as string,
+          pan: formData.get('pan') as string,
+      };
+      const docRef = doc(firestore, 'customers', editingCustomer.id);
+      setDocumentNonBlocking(docRef, updatedCustomer, { merge: true });
+      setEditingCustomer(null);
+  }
+
+  const handleDeleteCustomer = (customerId: string) => {
+    if (!firestore) return;
+    deleteDocumentNonBlocking(doc(firestore, 'customers', customerId));
+  }
+
+  const columns: ColumnDef<Customer>[] = [
+      {
+        id: 'expander',
+        header: () => null,
+        cell: ({ row }) => {
+          return row.getCanExpand() ? (
+            <button
+              {...{
+                onClick: row.getToggleExpandedHandler(),
+                style: { cursor: 'pointer' },
+              }}
+            >
+              {row.getIsExpanded() ? <ChevronDownIcon /> : <ChevronRightIcon />}
+            </button>
+          ) : null
+        },
+      },
     {
-    id: 'expander',
-    header: () => null,
-    cell: ({ row }) => {
-      return row.getCanExpand() ? (
-        <button
-          {...{
-            onClick: row.getToggleExpandedHandler(),
-            style: { cursor: 'pointer' },
-          }}
-        >
-          {row.getIsExpanded() ? <ChevronDownIcon /> : <ChevronRightIcon />}
-        </button>
-      ) : null
-    },
-  },
-  {
-    accessorKey: "name",
-    header: "Name",
-    cell: ({ row }) => {
-      const customer = row.original;
-      const avatar = getImage(customer.avatar);
-      return (
-        <div className="flex items-center gap-3">
-          <Avatar>
-            {avatar && <Image src={avatar.imageUrl} alt={customer.name} width={40} height={40} data-ai-hint={avatar.imageHint} />}
-            <AvatarFallback>
-              {customer.name.charAt(0)}
-            </AvatarFallback>
-          </Avatar>
-          <div className="flex flex-col">
-            <span className="font-medium">{customer.name}</span>
-            <span className="text-sm text-muted-foreground">{customer.email}</span>
+      accessorKey: "name",
+      header: "Name",
+      cell: ({ row }) => {
+        const customer = row.original;
+        const avatar = getImage(customer.avatar);
+        return (
+          <div className="flex items-center gap-3">
+            <Avatar>
+              {avatar && <Image src={avatar.imageUrl} alt={customer.name} width={40} height={40} data-ai-hint={avatar.imageHint} />}
+              <AvatarFallback>
+                {customer.name.charAt(0)}
+              </AvatarFallback>
+            </Avatar>
+            <div className="flex flex-col">
+              <span className="font-medium">{customer.name}</span>
+              <span className="text-sm text-muted-foreground">{customer.email}</span>
+            </div>
           </div>
-        </div>
-      );
+        );
+      },
     },
-  },
-  {
-    accessorKey: "phone",
-    header: "Phone",
-  },
-  {
-    accessorKey: "aadhaar",
-    header: "Aadhaar",
-  },
-  {
-    accessorKey: "pan",
-    header: "PAN",
-  },
-  {
-    id: "actions",
-    cell: ({ row }) => {
-      const customer = row.original;
-      return (
-        <div className="text-right">
-          <Dialog>
+    {
+      accessorKey: "phone",
+      header: "Phone",
+    },
+    {
+      accessorKey: "aadhaar",
+      header: "Aadhaar",
+    },
+    {
+      accessorKey: "pan",
+      header: "PAN",
+    },
+    {
+      id: "actions",
+      cell: ({ row }) => {
+        const customer = row.original;
+        return (
+          <div className="text-right">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="h-8 w-8 p-0">
@@ -184,74 +252,19 @@ export const columns: ColumnDef<Customer>[] = [
                   Copy customer ID
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DialogTrigger asChild>
-                  <DropdownMenuItem>Edit customer</DropdownMenuItem>
-                </DialogTrigger>
-                <DropdownMenuItem className="text-destructive">
+                <DropdownMenuItem onClick={() => setEditingCustomer(customer)}>Edit customer</DropdownMenuItem>
+                <DropdownMenuItem 
+                    onClick={() => handleDeleteCustomer(customer.id)}
+                    className="text-destructive">
                   Delete customer
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            <DialogContent className="sm:max-w-[425px]">
-              <DialogHeader>
-                <DialogTitle>Edit Customer</DialogTitle>
-                <DialogDescription>
-                  Update the details for the customer.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="name" className="text-right">
-                    Name
-                  </Label>
-                  <Input id="name" defaultValue={customer.name} className="col-span-3" />
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="email" className="text-right">
-                    Email
-                  </Label>
-                  <Input id="email" type="email" defaultValue={customer.email} className="col-span-3" />
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="phone" className="text-right">
-                    Phone
-                  </Label>
-                  <Input id="phone" defaultValue={customer.phone} className="col-span-3" />
-                </div>
-                 <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="mobile" className="text-right">
-                    Mobile
-                  </Label>
-                  <Input id="mobile" defaultValue={customer.phone} className="col-span-3" />
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="aadhaar" className="text-right">
-                    Aadhaar
-                  </Label>
-                  <Input id="aadhaar" defaultValue={customer.aadhaar} className="col-span-3" />
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="pan" className="text-right">
-                    PAN
-                  </Label>
-                  <Input id="pan" defaultValue={customer.pan} className="col-span-3" />
-                </div>
-              </div>
-              <DialogFooter>
-                  <DialogClose asChild>
-                      <Button type="submit">Save Changes</Button>
-                  </DialogClose>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        </div>
-      );
+          </div>
+        );
+      },
     },
-  },
-];
-
-export default function CustomersPage() {
-  const [globalFilter, setGlobalFilter] = React.useState('');
+  ];
 
   const filteredData = React.useMemo(() => {
     if (!globalFilter) {
@@ -264,14 +277,14 @@ export default function CustomersPage() {
       );
       return (
         customer.name.toLowerCase().includes(lowercasedFilter) ||
-        customer.phone.toLowerCase().includes(lowercasedFilter) ||
-        customer.aadhaar.toLowerCase().includes(lowercasedFilter) ||
+        (customer.phone && customer.phone.toLowerCase().includes(lowercasedFilter)) ||
+        (customer.aadhaar && customer.aadhaar.toLowerCase().includes(lowercasedFilter)) ||
         customerInvoices.some((invoice) =>
           invoice.invoiceNumber?.toLowerCase().includes(lowercasedFilter)
         )
       );
     });
-  }, [globalFilter]);
+  }, [globalFilter, data, invoices]);
 
 
   const table = useReactTable({
@@ -305,59 +318,119 @@ export default function CustomersPage() {
                 <Button>Add Customer</Button>
               </DialogTrigger>
               <DialogContent className="sm:max-w-[425px]">
-                <DialogHeader>
-                  <DialogTitle>Add New Customer</DialogTitle>
-                  <DialogDescription>
-                    Fill in the details for the new customer.
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="grid gap-4 py-4">
-                  <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="name" className="text-right">
-                      Name
-                    </Label>
-                    <Input id="name" className="col-span-3" />
+                <form onSubmit={handleAddNewCustomer}>
+                  <DialogHeader>
+                    <DialogTitle>Add New Customer</DialogTitle>
+                    <DialogDescription>
+                      Fill in the details for the new customer.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="grid gap-4 py-4">
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <Label htmlFor="name" className="text-right">
+                        Name
+                      </Label>
+                      <Input id="name" name="name" className="col-span-3" />
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <Label htmlFor="email" className="text-right">
+                        Email
+                      </Label>
+                      <Input id="email" name="email" type="email" className="col-span-3" />
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <Label htmlFor="phone" className="text-right">
+                        Phone
+                      </Label>
+                      <Input id="phone" name="phone" className="col-span-3" />
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <Label htmlFor="mobile" className="text-right">
+                        Mobile
+                      </Label>
+                      <Input id="mobile" name="mobile" className="col-span-3" />
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <Label htmlFor="aadhaar" className="text-right">
+                        Aadhaar
+                      </Label>
+                      <Input id="aadhaar" name="aadhaar" className="col-span-3" />
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <Label htmlFor="pan" className="text-right">
+                        PAN
+                      </Label>
+                      <Input id="pan" name="pan" className="col-span-3" />
+                    </div>
                   </div>
-                  <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="email" className="text-right">
-                      Email
-                    </Label>
-                    <Input id="email" type="email" className="col-span-3" />
-                  </div>
-                  <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="phone" className="text-right">
-                      Phone
-                    </Label>
-                    <Input id="phone" className="col-span-3" />
-                  </div>
-                  <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="mobile" className="text-right">
-                      Mobile
-                    </Label>
-                    <Input id="mobile" className="col-span-3" />
-                  </div>
-                  <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="aadhaar" className="text-right">
-                      Aadhaar
-                    </Label>
-                    <Input id="aadhaar" className="col-span-3" />
-                  </div>
-                  <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="pan" className="text-right">
-                      PAN
-                    </Label>
-                    <Input id="pan" className="col-span-3" />
-                  </div>
-                </div>
-                <DialogFooter>
-                    <DialogClose asChild>
-                        <Button type="submit">Save Customer</Button>
-                    </DialogClose>
-                </DialogFooter>
+                  <DialogFooter>
+                      <DialogClose asChild>
+                          <Button type="submit">Save Customer</Button>
+                      </DialogClose>
+                  </DialogFooter>
+                </form>
               </DialogContent>
             </Dialog>
         </div>
       </div>
+      
+      {/* Edit Customer Dialog */}
+      <Dialog open={!!editingCustomer} onOpenChange={() => setEditingCustomer(null)}>
+        <DialogContent className="sm:max-w-[425px]">
+          <form onSubmit={handleUpdateCustomer}>
+            <DialogHeader>
+              <DialogTitle>Edit Customer</DialogTitle>
+              <DialogDescription>
+                Update the details for the customer.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="name-edit" className="text-right">
+                  Name
+                </Label>
+                <Input id="name-edit" name="name" defaultValue={editingCustomer?.name} className="col-span-3" />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="email-edit" className="text-right">
+                  Email
+                </Label>
+                <Input id="email-edit" name="email" type="email" defaultValue={editingCustomer?.email} className="col-span-3" />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="phone-edit" className="text-right">
+                  Phone
+                </Label>
+                <Input id="phone-edit" name="phone" defaultValue={editingCustomer?.phone} className="col-span-3" />
+              </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="mobile-edit" className="text-right">
+                    Mobile
+                </Label>
+                <Input id="mobile-edit" name="mobile" defaultValue={(editingCustomer as any)?.mobile} className="col-span-3" />
+                </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="aadhaar-edit" className="text-right">
+                  Aadhaar
+                </Label>
+                <Input id="aadhaar-edit" name="aadhaar" defaultValue={editingCustomer?.aadhaar} className="col-span-3" />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="pan-edit" className="text-right">
+                  PAN
+                </Label>
+                <Input id="pan-edit" name="pan" defaultValue={editingCustomer?.pan} className="col-span-3" />
+              </div>
+            </div>
+            <DialogFooter>
+                <DialogClose asChild>
+                    <Button type="submit">Save Changes</Button>
+                </DialogClose>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+      
       <div className="rounded-md border">
         <Table>
           <TableHeader>
@@ -379,7 +452,13 @@ export default function CustomersPage() {
             ))}
           </TableHeader>
           <TableBody>
-            {table.getRowModel().rows?.length ? (
+            {isLoadingCustomers ? (
+              <TableRow>
+                <TableCell colSpan={columns.length} className="h-24 text-center">
+                  Loading customers...
+                </TableCell>
+              </TableRow>
+            ) : table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row) => (
                 <React.Fragment key={row.id}>
                 <TableRow
@@ -419,5 +498,3 @@ export default function CustomersPage() {
     </div>
   );
 }
-
-    

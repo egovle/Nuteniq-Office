@@ -16,6 +16,7 @@ export type Customer = {
   name: string;
   email: string;
   phone: string;
+  mobile: string;
   avatar: string;
   aadhaar: string;
   pan: string;
@@ -51,51 +52,9 @@ export type Invoice = {
   total: number;
 };
 
+// Data is now managed in Firestore, these arrays can be cleared or used for seeding.
 export const tasks: Task[] = [];
-
 export const customers: Customer[] = [];
-
 export let invoices: Invoice[] = [];
+export const employees: Employee[] = [];
 
-export const employees: Employee[] = [
-  {
-    id: 'EMP-001',
-    name: 'Alice Johnson',
-    email: 'alice@serviceflow.com',
-    role: 'Project Manager',
-    avatar: 'avatar-4',
-    skills: ['Management', 'Financial Reporting', 'Client Relations'],
-    workload: 3,
-    availability: true,
-  },
-  {
-    id: 'EMP-002',
-    name: 'Bob Brown',
-    email: 'bob@serviceflow.com',
-    role: 'Software Engineer',
-    avatar: 'avatar-5',
-    skills: ['React', 'Node.js', 'Bug Fixing', 'TypeScript'],
-    workload: 5,
-    availability: false,
-  },
-  {
-    id: 'EMP-003',
-    name: 'David Chen',
-    email: 'david@serviceflow.com',
-    role: 'Marketing Specialist',
-    avatar: 'avatar-6',
-    skills: ['SEO', 'Content Creation', 'Campaign Management'],
-    workload: 2,
-    availability: true,
-  },
-  {
-    id: 'EMP-004',
-    name: 'Sophia Rodriguez',
-    email: 'sophia@serviceflow.com',
-    role: 'Data Analyst',
-    avatar: 'avatar-1',
-    skills: ['SQL', 'Python', 'Database Management', 'Data Visualization'],
-    workload: 4,
-    availability: true,
-  },
-];
