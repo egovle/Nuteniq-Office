@@ -57,4 +57,3 @@ export const tasks: Task[] = [];
 export const customers: Customer[] = [];
 export let invoices: Invoice[] = [];
 export const employees: Employee[] = [];
-

@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "Task": {
@@ -150,8 +151,7 @@
   },
   "auth": {
     "providers": [
-      "password",
-      "anonymous"
+      "password"
     ]
   },
   "firestore": {
