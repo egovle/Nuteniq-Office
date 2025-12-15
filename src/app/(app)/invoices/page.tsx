@@ -27,6 +27,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { Upload } from "lucide-react";
+import { customers, invoices } from "@/lib/data";
 
 export default function InvoicePage() {
   const [loading, setLoading] = useState(false);
@@ -80,6 +81,52 @@ export default function InvoicePage() {
   const handleUploadClick = () => {
     fileInputRef.current?.click();
   };
+
+  const handleSaveData = () => {
+    if (!result) return;
+
+    let customer = customers.find(c => c.name.toLowerCase() === result.customerName.toLowerCase());
+    let customerId;
+
+    if (!customer) {
+      customerId = `CUS-${Date.now()}`;
+      customers.push({
+        id: customerId,
+        name: result.customerName,
+        email: '',
+        phone: '',
+        avatar: `avatar-${(customers.length % 6) + 1}`,
+        aadhaar: result.aadhaarNumber || '',
+        pan: ''
+      });
+    } else {
+        customerId = customer.id;
+    }
+    
+    const newInvoice = {
+        id: `INV-${Date.now()}`,
+        invoiceNumber: result.invoiceNumber,
+        customerId: customerId,
+        date: result.date,
+        items: result.items || [],
+        total: result.items?.reduce((acc, item) => acc + item.total, 0) || 0
+    };
+
+    invoices.push(newInvoice);
+
+    toast({
+        title: "Data Saved!",
+        description: `Invoice ${result.invoiceNumber} has been saved.`
+    })
+
+    // Reset state after saving
+    setResult(null);
+    setPreview(null);
+    if(fileInputRef.current) {
+        fileInputRef.current.value = "";
+    }
+  };
+
 
   return (
     <div className="grid gap-8 md:grid-cols-2">
@@ -232,7 +279,7 @@ export default function InvoicePage() {
         </CardContent>
         {result && !loading && (
           <CardFooter>
-            <Button className="w-full">Save Extracted Data</Button>
+            <Button className="w-full" onClick={handleSaveData}>Save Extracted Data</Button>
           </CardFooter>
         )}
       </Card>

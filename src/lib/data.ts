@@ -31,9 +31,27 @@ export type Employee = {
   availability: boolean;
 };
 
+export type InvoiceItem = {
+  name: string;
+  quantity: number;
+  price: number;
+  total: number;
+};
+
+export type Invoice = {
+  id: string;
+  invoiceNumber?: string;
+  customerId: string;
+  date: string;
+  items: InvoiceItem[];
+  total: number;
+};
+
 export const tasks: Task[] = [];
 
 export const customers: Customer[] = [];
+
+export let invoices: Invoice[] = [];
 
 export const employees: Employee[] = [
   {
