@@ -75,6 +75,7 @@ import { collection, doc } from "firebase/firestore";
 
 export default function TasksPage() {
   const { firestore } = useFirebase();
+  const [dueDate, setDueDate] = React.useState<Date | undefined>();
 
   const tasksQuery = useMemoFirebase(() => firestore ? collection(firestore, 'tasks') : null, [firestore]);
   const { data: tasksData, isLoading: isLoadingTasks } = useCollection<Task>(tasksQuery);
@@ -218,13 +219,14 @@ export default function TasksPage() {
         invoice: formData.get('invoice') as string,
         assignee: formData.get('assignee') as string,
         priority: formData.get('priority') as string,
-        dueDate: formData.get('dueDate') ? format(new Date(formData.get('dueDate') as string), "yyyy-MM-dd") : '',
+        dueDate: dueDate ? format(dueDate, "yyyy-MM-dd") : '',
         status: 'Todo',
         createdAt: new Date().toISOString(),
     };
 
     const newDocRef = doc(collection(firestore, "tasks"));
     addDocumentNonBlocking(collection(firestore, "tasks"), { ...newTask, id: newDocRef.id });
+    setDueDate(undefined);
   };
 
 
@@ -340,16 +342,20 @@ export default function TasksPage() {
                         variant={"outline"}
                         className={cn(
                           "w-full justify-start text-left font-normal col-span-3",
-                          !Date && "text-muted-foreground"
+                          !dueDate && "text-muted-foreground"
                         )}
                       >
                         <CalendarIcon className="mr-2 h-4 w-4" />
-                        {/* We need a state for the date picker */}
-                        <span>Pick a date</span>
+                        {dueDate ? format(dueDate, "PPP") : <span>Pick a date</span>}
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0">
-                      <Calendar mode="single" initialFocus />
+                      <Calendar
+                        mode="single"
+                        selected={dueDate}
+                        onSelect={setDueDate}
+                        initialFocus
+                      />
                     </PopoverContent>
                   </Popover>
                 </div>
