@@ -1,0 +1,236 @@
+{
+  "entities": {
+    "Task": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Task",
+      "type": "object",
+      "description": "Represents a task within the ServiceFlow application.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Task entity."
+        },
+        "customerId": {
+          "type": "string",
+          "description": "Reference to Customer. (Relationship: Customer 1:N Task)"
+        },
+        "assigneeId": {
+          "type": "string",
+          "description": "Reference to Employee assigned to this task. (Relationship: Employee 1:N Task)"
+        },
+        "priority": {
+          "type": "string",
+          "description": "Priority level of the task (High, Medium, Low).",
+          "format": "string"
+        },
+        "creationDate": {
+          "type": "string",
+          "description": "Date when the task was created.",
+          "format": "date-time"
+        },
+        "resolutionDate": {
+          "type": "string",
+          "description": "Date when the task was resolved.",
+          "format": "date-time"
+        },
+        "description": {
+          "type": "string",
+          "description": "A description of the task."
+        }
+      },
+      "required": [
+        "id",
+        "customerId",
+        "assigneeId",
+        "priority",
+        "creationDate"
+      ]
+    },
+    "Customer": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Customer",
+      "type": "object",
+      "description": "Represents a customer profile in the ServiceFlow application.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Customer entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the customer."
+        },
+        "aadhaarNumber": {
+          "type": "string",
+          "description": "Aadhaar number of the customer (encrypted)."
+        },
+        "panNumber": {
+          "type": "string",
+          "description": "PAN number of the customer (encrypted)."
+        },
+        "passportDetails": {
+          "type": "string",
+          "description": "Passport details of the customer (encrypted)."
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ]
+    },
+    "Invoice": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Invoice",
+      "type": "object",
+      "description": "Represents an invoice uploaded into the ServiceFlow application.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Invoice entity."
+        },
+        "invoiceNumber": {
+          "type": "string",
+          "description": "Invoice number."
+        },
+        "customerId": {
+          "type": "string",
+          "description": "Reference to the Customer associated with the invoice. (Relationship: Customer 1:N Invoice)"
+        },
+        "date": {
+          "type": "string",
+          "description": "Date of the invoice.",
+          "format": "date-time"
+        },
+        "aadhaarNumber": {
+          "type": "string",
+          "description": "Aadhaar number extracted from the invoice."
+        }
+      },
+      "required": [
+        "id",
+        "customerId",
+        "date"
+      ]
+    },
+    "Employee": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Employee",
+      "type": "object",
+      "description": "Represents an employee account in the ServiceFlow application.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Employee entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the employee."
+        },
+        "email": {
+          "type": "string",
+          "description": "Email address of the employee.",
+          "format": "email"
+        },
+        "skills": {
+          "type": "array",
+          "description": "List of skills the employee possesses.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "workload": {
+          "type": "number",
+          "description": "Current workload of the employee."
+        },
+        "availability": {
+          "type": "boolean",
+          "description": "Indicates if the employee is currently available for new tasks."
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "email"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/customers/{customerId}",
+        "definition": {
+          "entityName": "Customer",
+          "schema": {
+            "$ref": "#/backend/entities/Customer"
+          },
+          "description": "Stores customer profiles. Aadhaar, PAN, and passport details are encrypted. Accessible to authorized employees.",
+          "params": [
+            {
+              "name": "customerId",
+              "description": "The unique identifier for the customer."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/customers/{customerId}/tasks/{taskId}",
+        "definition": {
+          "entityName": "Task",
+          "schema": {
+            "$ref": "#/backend/entities/Task"
+          },
+          "description": "Stores tasks associated with a customer. Includes denormalized 'customerId' for authorization independence.",
+          "params": [
+            {
+              "name": "customerId",
+              "description": "The unique identifier for the customer."
+            },
+            {
+              "name": "taskId",
+              "description": "The unique identifier for the task."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/invoices/{invoiceId}",
+        "definition": {
+          "entityName": "Invoice",
+          "schema": {
+            "$ref": "#/backend/entities/Invoice"
+          },
+          "description": "Stores invoices. Includes 'customerId' for association with customer data.",
+          "params": [
+            {
+              "name": "invoiceId",
+              "description": "The unique identifier for the invoice."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/employees/{employeeId}",
+        "definition": {
+          "entityName": "Employee",
+          "schema": {
+            "$ref": "#/backend/entities/Employee"
+          },
+          "description": "Stores employee profiles. Accessible to administrators.",
+          "params": [
+            {
+              "name": "employeeId",
+              "description": "The unique identifier for the employee."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore data structure is designed to support the ServiceFlow application's requirements, focusing on secure data access, scalability, and ease of debugging. The design emphasizes authorization independence via denormalization to avoid `get()` calls in security rules and ensures clear ownership through hierarchical paths.\n\n**Key Structural Decisions:**\n\n*   **/customers/{customerId}:** Stores customer profiles. All customer data is private and only accessible to authorized users (e.g., employees with specific roles or the customer themselves if self-service features are implemented).\n*   **/customers/{customerId}/tasks/{taskId}:** Stores tasks associated with a customer. The `customerId` is denormalized within each task document, providing authorization independence. This allows security rules to validate that the current user has access to the specified customer's tasks without needing to perform a `get()` on the customer document.\n*   **/employees/{employeeId}:** Stores employee profiles. Employee data is generally considered private and accessible only to administrators or the employees themselves.\n*   **/invoices/{invoiceId}:** Stores invoices. Invoice documents include the `customerId`, enabling efficient querying and reporting based on customer data. Invoice data access is restricted based on user roles and customer relationships.\n\n**Authorization Independence (Denormalization):**\n\nThe structure achieves authorization independence primarily through the denormalization of the `customerId` in the `/customers/{customerId}/tasks/{taskId}` collection. This is CRITICAL because it allows us to secure task documents based on the customer relationship without needing to perform a costly `get()` operation on the parent customer document. For example, a security rule can easily check if the `request.auth.uid` has access to the customer specified by the `customerId` field in the task document.\n\n**QAPs (Rules are not Filters):**\n\nThe structure supports the required QAPs (Rules are not Filters) as follows:\n\n*   **Secure List Operations:** By segregating data based on ownership and denormalizing authorization data, list operations can be secured without filtering. For example, listing tasks for a specific customer under `/customers/{customerId}/tasks` only requires checking if the user has access to that customer's data. Since `customerId` is present in Task, we can validate that `request.resource.data.customerId == customerId`. This enables secure retrieval of tasks.\n\n*   **Role-Based Access Control:** The `/employees/{employeeId}` collection facilitates role-based access control. Security rules can check if a user has a specific role (e.g., admin) before allowing them to create or modify employee profiles.\n\n**Other Considerations:**\n\n*   **Data Validation:** Security rules will enforce data validation to ensure data integrity and consistency. For example, rules will validate the format and type of fields, such as dates and priority levels.\n*   **Scalability:** The data structure is designed to scale efficiently as the application grows. The use of subcollections and denormalization allows for efficient querying and indexing of data.\n*   **Debuggability:** The clear and consistent structure, combined with explicit security rules, makes it easier to debug access control issues. Naming conventions and documentation will further enhance debuggability."
+  }
+}

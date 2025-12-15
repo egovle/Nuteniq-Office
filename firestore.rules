@@ -1,0 +1,189 @@
+/**
+ * Core Philosophy: This ruleset implements a role-based access model for an internal service application.
+ * It assumes two primary user states: unauthenticated users (who have no access) and authenticated
+ * users, who are treated as trusted "employees." Access to sensitive customer and invoice data is
+ * granted to all employees, while personal employee data is strictly private to the employee themselves.
+ * The default security posture is to deny all access unless explicitly granted.
+ *
+ * Data Structure: The data is organized into logical, top-level collections for `customers`,
+ * `invoices`, and `employees`. Tasks are nested within the customer they belong to
+ * (`/customers/{customerId}/tasks/{taskId}`), creating a clear hierarchical ownership model that
+ * simplifies security rules.
+ *
+ * Key Security Decisions:
+ * - Employee-Only Access: All data access requires user authentication. There is no public data.
+ * - No Collection Listing: Listing the root `customers`, `invoices`, or `employees` collections is
+ *   explicitly forbidden to prevent data enumeration and exfiltration.
+ * - Employee Profile Privacy: An employee can only view and edit their own profile in the `/employees`
+ *   collection, enforcing strong privacy boundaries between staff.
+ * - Task Scoping: Employees can list tasks, but only within the context of a specific customer
+ *   (`/customers/{customerId}/tasks`), preventing broad, unfiltered queries.
+ *
+ * Denormalization for Authorization: The ruleset relies on denormalized data for efficient and
+ * secure authorization. Specifically:
+ * - Task documents under `/customers/{customerId}/tasks/{taskId}` must contain a `customerId` field
+ *   that matches the `customerId` in the path. This allows rules to enforce relational integrity
+ *   without performing costly `get()` calls to the parent customer document.
+ *
+ * Structural Segregation: The use of a nested collection for tasks (`/customers/{customerId}/tasks`)
+ * provides strong structural segregation. This pattern ensures that all tasks are inherently and
+ * securely linked to a specific customer, making it impossible to create an "orphan" task and
+ * simplifying rules for access control.
+ */
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ------------------------------------------------------------------------
+    // Helper Functions
+    // ------------------------------------------------------------------------
+
+    /**
+     * Returns true if the user is authenticated.
+     */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /**
+     * Returns true if the authenticated user's UID matches the provided userId.
+     * This is the primary function for enforcing document ownership.
+     */
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    /**
+     * Returns true if the user is the owner of an existing document.
+     * Used for safe update and delete operations.
+     */
+    function isExistingOwner(userId) {
+      return isOwner(userId) && resource != null;
+    }
+
+    /**
+     * Validates relational fields for a new Customer document.
+     * Ensures the document ID is stored inside the document for consistency.
+     */
+    function isCreatingValidCustomer(customerId) {
+      return request.resource.data.id == customerId;
+    }
+
+    /**
+     * Enforces immutability of the customer's unique ID during updates.
+     */
+    function isUpdatingValidCustomer() {
+      return request.resource.data.id == resource.data.id;
+    }
+
+    /**
+     * Validates relational fields for a new Task document.
+     * Ensures path consistency with both the task ID and the parent customer ID.
+     */
+    function isCreatingValidTask(customerId, taskId) {
+      let data = request.resource.data;
+      return data.id == taskId && data.customerId == customerId;
+    }
+
+    /**
+     * Enforces immutability of a task's unique ID and its parent customer link.
+     */
+    function isUpdatingValidTask() {
+      let newData = request.resource.data;
+      let oldData = resource.data;
+      return newData.id == oldData.id && newData.customerId == oldData.customerId;
+    }
+
+    /**
+     * Validates relational fields for a new Invoice document.
+     */
+    function isCreatingValidInvoice(invoiceId) {
+      return request.resource.data.id == invoiceId;
+    }
+
+    /**
+     * Enforces immutability of the invoice's unique ID during updates.
+     */
+    function isUpdatingValidInvoice() {
+      return request.resource.data.id == resource.data.id;
+    }
+
+    /**
+     * Validates relational fields for a new Employee document.
+     */
+    function isCreatingValidEmployee(employeeId) {
+      return request.resource.data.id == employeeId;
+    }
+
+    /**
+     * Enforces immutability of the employee's unique ID during updates.
+     */
+    function isUpdatingValidEmployee() {
+      return request.resource.data.id == resource.data.id;
+    }
+
+    // ------------------------------------------------------------------------
+    // Collection Rules
+    // ------------------------------------------------------------------------
+
+    /**
+     * @description Manages customer profiles. All authenticated employees can read and write customer data, but cannot list all customers.
+     * @path /customers/{customerId}
+     * @allow (get) An authenticated employee requests `/customers/customer_123`.
+     * @deny (list) An authenticated employee tries to list the entire `/customers` collection.
+     * @principle Restricts broad data access by disabling collection listing, forcing client access to be specific and targeted.
+     */
+    match /customers/{customerId} {
+      allow get: if isSignedIn();
+      allow list: if false;
+      allow create: if isSignedIn() && isCreatingValidCustomer(customerId);
+      allow update: if isSignedIn() && resource != null && isUpdatingValidCustomer();
+      allow delete: if isSignedIn() && resource != null;
+
+      /**
+       * @description Manages tasks for a specific customer. Any authenticated employee can manage tasks for any customer.
+       * @path /customers/{customerId}/tasks/{taskId}
+       * @allow (create) An authenticated employee creates a task at `/customers/customer_123/tasks/task_456` with `customerId: "customer_123"` in the data.
+       * @deny (create) An employee tries to create a task at `/customers/customer_123/tasks/task_456` but with `customerId: "customer_abc"` in the data.
+       * @principle Enforces relational integrity by ensuring a task's internal `customerId` matches its location in the database path.
+       */
+      match /tasks/{taskId} {
+        allow get: if isSignedIn();
+        allow list: if isSignedIn();
+        allow create: if isSignedIn() && isCreatingValidTask(customerId, taskId);
+        allow update: if isSignedIn() && resource != null && isUpdatingValidTask();
+        allow delete: if isSignedIn() && resource != null;
+      }
+    }
+
+    /**
+     * @description Manages invoices. Authenticated employees can manage individual invoices, but listing all invoices is disallowed.
+     * @path /invoices/{invoiceId}
+     * @allow (get) An authenticated employee requests `/invoices/inv_123`.
+     * @deny (list) An employee tries to list all documents in the `/invoices` collection.
+     * @principle Disallows collection listing to prevent enumeration of all company invoices.
+     */
+    match /invoices/{invoiceId} {
+      allow get: if isSignedIn();
+      allow list: if false;
+      allow create: if isSignedIn() && isCreatingValidInvoice(invoiceId);
+      allow update: if isSignedIn() && resource != null && isUpdatingValidInvoice();
+      allow delete: if isSignedIn() && resource != null;
+    }
+
+    /**
+     * @description Manages employee profiles. Access is restricted to the employee themselves.
+     * @path /employees/{employeeId}
+     * @allow (update) An authenticated user with UID `emp_123` updates the document at `/employees/emp_123`.
+     * @deny (get) An authenticated user with UID `emp_456` attempts to read `/employees/emp_123`.
+     * @principle Enforces strict document ownership, ensuring an employee's personal data is private and cannot be accessed by other employees.
+     */
+    match /employees/{employeeId} {
+      allow get: if isOwner(employeeId);
+      allow list: if false;
+      allow create: if isOwner(employeeId) && isCreatingValidEmployee(employeeId);
+      allow update: if isExistingOwner(employeeId) && isUpdatingValidEmployee();
+      allow delete: if isExistingOwner(employeeId);
+    }
+  }
+}
