@@ -24,17 +24,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { Upload } from "lucide-react";
-import { customers } from "@/lib/data";
 
 export default function InvoicePage() {
   const [loading, setLoading] = useState(false);
@@ -180,18 +172,11 @@ export default function InvoicePage() {
             <div className="space-y-4">
               <div>
                 <Label htmlFor="customerName">Customer Name</Label>
-                <Select defaultValue={result.customerName}>
-                  <SelectTrigger id="customerName">
-                    <SelectValue placeholder="Select a customer" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {customers.map((c) => (
-                      <SelectItem key={c.id} value={c.name}>
-                        {c.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Input
+                  id="customerName"
+                  value={result.customerName || ""}
+                  readOnly
+                />
               </div>
               <div>
                 <Label htmlFor="invoiceNumber">Invoice Number</Label>

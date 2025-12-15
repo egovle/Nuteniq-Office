@@ -1,4 +1,3 @@
-// InvoiceDataExtraction
 'use server';
 /**
  * @fileOverview Invoice data extraction flow.
@@ -18,7 +17,7 @@ const InvoiceDataExtractionInputSchema = z.object({
   invoiceDataUri: z
     .string()
     .describe(
-      'The invoice document, as a data URI that must include a MIME type and use Base64 encoding. Expected format: \'data:<mimetype>;base64,<encoded_data>\'.'
+      "The invoice document, as a data URI that must include a MIME type and use Base64 encoding. Expected format: 'data:<mimetype>;base64,<encoded_data>'."
     ),
 });
 export type InvoiceDataExtractionInput = z.infer<typeof InvoiceDataExtractionInputSchema>;
@@ -54,9 +53,9 @@ const invoiceDataExtractionPrompt = ai.definePrompt({
   The invoice image is provided as a data URI: {{{media url=invoiceDataUri}}}
 
   Please extract the following fields:
-  - **invoiceNumber**: The unique identifier for the invoice.
-  - **customerName**: The name of the person or company being billed. This is often labeled as 'Bill To', 'To', or is the most prominent name that isn't the sender.
-  - **date**: The date the invoice was issued.
+  - **invoiceNumber**: The unique identifier for the invoice. Look for labels like "Invoice No.".
+  - **customerName**: The name of the person or company being billed. Pay close attention to text under the labels 'Bill To' or 'Ship To'. This is the recipient of the invoice.
+  - **date**: The date the invoice was issued. Look for "Invoice Date".
   - **aadhaarNumber**: The Aadhaar number of the customer, if present.
   - **items**: A list of all line items. Each item should have a 'name', 'quantity', 'price', and 'total'.
 
