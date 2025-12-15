@@ -13,6 +13,7 @@ import {
   getExpandedRowModel,
   useReactTable,
   Row,
+  getFilteredRowModel,
 } from "@tanstack/react-table";
 
 import { Button } from "@/components/ui/button";
@@ -250,10 +251,38 @@ export const columns: ColumnDef<Customer>[] = [
 ];
 
 export default function CustomersPage() {
+  const [globalFilter, setGlobalFilter] = React.useState('');
+
+  const filteredData = React.useMemo(() => {
+    if (!globalFilter) {
+      return data;
+    }
+    const lowercasedFilter = globalFilter.toLowerCase();
+    return data.filter((customer) => {
+      const customerInvoices = invoices.filter(
+        (invoice) => invoice.customerId === customer.id
+      );
+      return (
+        customer.name.toLowerCase().includes(lowercasedFilter) ||
+        customer.phone.toLowerCase().includes(lowercasedFilter) ||
+        customer.aadhaar.toLowerCase().includes(lowercasedFilter) ||
+        customerInvoices.some((invoice) =>
+          invoice.invoiceNumber?.toLowerCase().includes(lowercasedFilter)
+        )
+      );
+    });
+  }, [globalFilter]);
+
+
   const table = useReactTable({
-    data,
+    data: filteredData,
     columns,
+    state: {
+      globalFilter,
+    },
+    onGlobalFilterChange: setGlobalFilter,
     getCoreRowModel: getCoreRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
     getExpandedRowModel: getExpandedRowModel(),
     getRowCanExpand: () => true,
   });
@@ -262,62 +291,72 @@ export default function CustomersPage() {
     <div className="w-full">
       <div className="flex items-center justify-between py-4">
         <h1 className="text-2xl font-bold">Customers</h1>
-        <Dialog>
-          <DialogTrigger asChild>
-            <Button>Add Customer</Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[425px]">
-            <DialogHeader>
-              <DialogTitle>Add New Customer</DialogTitle>
-              <DialogDescription>
-                Fill in the details for the new customer.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="name" className="text-right">
-                  Name
-                </Label>
-                <Input id="name" className="col-span-3" />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="email" className="text-right">
-                  Email
-                </Label>
-                <Input id="email" type="email" className="col-span-3" />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="phone" className="text-right">
-                  Phone
-                </Label>
-                <Input id="phone" className="col-span-3" />
-              </div>
-               <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="mobile" className="text-right">
-                  Mobile
-                </Label>
-                <Input id="mobile" className="col-span-3" />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="aadhaar" className="text-right">
-                  Aadhaar
-                </Label>
-                <Input id="aadhaar" className="col-span-3" />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="pan" className="text-right">
-                  PAN
-                </Label>
-                <Input id="pan" className="col-span-3" />
-              </div>
-            </div>
-            <DialogFooter>
-                <DialogClose asChild>
-                    <Button type="submit">Save Customer</Button>
-                </DialogClose>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        <div className="flex items-center gap-2">
+            <Input
+              placeholder="Search by name, phone, aadhaar, invoice..."
+              value={globalFilter ?? ''}
+              onChange={(event) =>
+                setGlobalFilter(event.target.value)
+              }
+              className="max-w-sm"
+            />
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button>Add Customer</Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                  <DialogTitle>Add New Customer</DialogTitle>
+                  <DialogDescription>
+                    Fill in the details for the new customer.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="name" className="text-right">
+                      Name
+                    </Label>
+                    <Input id="name" className="col-span-3" />
+                  </div>
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="email" className="text-right">
+                      Email
+                    </Label>
+                    <Input id="email" type="email" className="col-span-3" />
+                  </div>
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="phone" className="text-right">
+                      Phone
+                    </Label>
+                    <Input id="phone" className="col-span-3" />
+                  </div>
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="mobile" className="text-right">
+                      Mobile
+                    </Label>
+                    <Input id="mobile" className="col-span-3" />
+                  </div>
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="aadhaar" className="text-right">
+                      Aadhaar
+                    </Label>
+                    <Input id="aadhaar" className="col-span-3" />
+                  </div>
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="pan" className="text-right">
+                      PAN
+                    </Label>
+                    <Input id="pan" className="col-span-3" />
+                  </div>
+                </div>
+                <DialogFooter>
+                    <DialogClose asChild>
+                        <Button type="submit">Save Customer</Button>
+                    </DialogClose>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+        </div>
       </div>
       <div className="rounded-md border">
         <Table>
@@ -380,3 +419,5 @@ export default function CustomersPage() {
     </div>
   );
 }
+
+    
