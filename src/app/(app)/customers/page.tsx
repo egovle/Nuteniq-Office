@@ -593,11 +593,15 @@ export default function CustomersPage() {
   }, [searchValue, searchBy, customers, invoices]);
 
   React.useEffect(() => {
-    // When filteredData changes, automatically expand all rows.
+    // When filteredData changes, automatically expand all rows if there's a search value.
     if (searchValue) {
-        const allRowIds = filteredData.map((_, index) => String(index));
+        const allRowIds = filteredData.map((c) => c.id);
         const newExpandedState = allRowIds.reduce((acc, id) => {
-          acc[id] = true;
+          // Find the index of the customer in the original `data` array for the table
+          const rowIndex = table.getRowModel().rows.findIndex(row => row.original.id === id);
+          if (rowIndex !== -1) {
+            acc[String(rowIndex)] = true;
+          }
           return acc;
         }, {} as ExpandedState);
         setExpanded(newExpandedState);
@@ -820,3 +824,5 @@ export default function CustomersPage() {
     </div>
   );
 }
+
+    
