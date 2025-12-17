@@ -161,12 +161,12 @@ export default function CustomersPage() {
       const formData = new FormData(e.currentTarget);
       const updatedCustomer = {
           ...editingCustomer,
-          name: formData.get('name') as string,
-          email: formData.get('email') as string,
-          phone: formData.get('phone') as string,
-          mobile: formData.get('mobile') as string,
-          aadhaar: formData.get('aadhaar') as string,
-          pan: formData.get('pan') as string,
+          name: formData.get('name-edit') as string,
+          email: formData.get('email-edit') as string,
+          phone: formData.get('phone-edit') as string,
+          mobile: formData.get('mobile-edit') as string,
+          aadhaar: formData.get('aadhaar-edit') as string,
+          pan: formData.get('pan-edit') as string,
       };
       const docRef = doc(firestore, 'customers', editingCustomer.id);
       setDocumentNonBlocking(docRef, updatedCustomer, { merge: true });
@@ -387,37 +387,37 @@ export default function CustomersPage() {
                 <Label htmlFor="name-edit" className="text-right">
                   Name
                 </Label>
-                <Input id="name-edit" name="name" defaultValue={editingCustomer?.name} className="col-span-3" />
+                <Input id="name-edit" name="name-edit" defaultValue={editingCustomer?.name} className="col-span-3" />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="email-edit" className="text-right">
                   Email
                 </Label>
-                <Input id="email-edit" name="email" type="email" defaultValue={editingCustomer?.email} className="col-span-3" />
+                <Input id="email-edit" name="email-edit" type="email" defaultValue={editingCustomer?.email} className="col-span-3" />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="phone-edit" className="text-right">
                   Phone
                 </Label>
-                <Input id="phone-edit" name="phone" defaultValue={editingCustomer?.phone} className="col-span-3" />
+                <Input id="phone-edit" name="phone-edit" defaultValue={editingCustomer?.phone} className="col-span-3" />
               </div>
                 <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="mobile-edit" className="text-right">
                     Mobile
                 </Label>
-                <Input id="mobile-edit" name="mobile" defaultValue={editingCustomer?.mobile} className="col-span-3" />
+                <Input id="mobile-edit" name="mobile-edit" defaultValue={editingCustomer?.mobile} className="col-span-3" />
                 </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="aadhaar-edit" className="text-right">
                   Aadhaar
                 </Label>
-                <Input id="aadhaar-edit" name="aadhaar" defaultValue={editingCustomer?.aadhaar} className="col-span-3" />
+                <Input id="aadhaar-edit" name="aadhaar-edit" defaultValue={editingCustomer?.aadhaar} className="col-span-3" />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="pan-edit" className="text-right">
                   PAN
                 </Label>
-                <Input id="pan-edit" name="pan" defaultValue={editingCustomer?.pan} className="col-span-3" />
+                <Input id="pan-edit" name="pan-edit" defaultValue={editingCustomer?.pan} className="col-span-3" />
               </div>
             </div>
             <DialogFooter>
@@ -496,3 +496,5 @@ export default function CustomersPage() {
     </div>
   );
 }
+
+    
