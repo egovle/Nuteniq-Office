@@ -52,7 +52,8 @@ import Image from "next/image";
 import { Badge } from "@/components/ui/badge";
 import { useCollection, useFirebase, useMemoFirebase } from "@/firebase";
 import { collection, doc, query, where } from "firebase/firestore";
-import { addDocumentNonBlocking, setDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase/non-blocking-updates";
+import { setDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase/non-blocking-updates";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const getImage = (id: string) =>
   PlaceHolderImages.find((img) => img.id === id);
@@ -135,17 +136,14 @@ const ServicesSubTable = ({ row }: { row: Row<Customer> }) => {
 
 export default function CustomersPage() {
   const { firestore } = useFirebase();
-  const [globalFilter, setGlobalFilter] = React.useState('');
+  const [searchValue, setSearchValue] = React.useState('');
+  const [searchBy, setSearchBy] = React.useState('name');
   const [editingCustomer, setEditingCustomer] = React.useState<Customer | null>(null);
 
   const customersQuery = useMemoFirebase(() => firestore ? collection(firestore, 'customers') : null, [firestore]);
   const { data: customersData, isLoading: isLoadingCustomers } = useCollection<Customer>(customersQuery);
 
-  const invoicesQuery = useMemoFirebase(() => firestore ? collection(firestore, 'invoices') : null, [firestore]);
-  const { data: invoicesData } = useCollection<Invoice>(invoicesQuery);
-
   const data = customersData || [];
-  const invoices = invoicesData || [];
 
   const handleAddNewCustomer = (e: React.FormEvent<HTMLFormElement>) => {
       e.preventDefault();
@@ -221,13 +219,14 @@ export default function CustomersPage() {
                 {customer.name.charAt(0)}
               </AvatarFallback>
             </Avatar>
-            <div className="flex flex-col">
-              <span className="font-medium">{customer.name}</span>
-              <span className="text-sm text-muted-foreground">{customer.email}</span>
-            </div>
+            <span className="font-medium">{customer.name}</span>
           </div>
         );
       },
+    },
+    {
+        accessorKey: "email",
+        header: "Email",
     },
     {
       accessorKey: "mobile",
@@ -277,33 +276,20 @@ export default function CustomersPage() {
   ];
 
   const filteredData = React.useMemo(() => {
-    if (!globalFilter) {
+    if (!searchValue) {
       return data;
     }
-    const lowercasedFilter = globalFilter.toLowerCase();
+    const lowercasedFilter = searchValue.toLowerCase();
     return data.filter((customer) => {
-      const customerInvoices = invoices.filter(
-        (invoice) => invoice.customerId === customer.id
-      );
-      return (
-        customer.name.toLowerCase().includes(lowercasedFilter) ||
-        (customer.mobile && customer.mobile.toLowerCase().includes(lowercasedFilter)) ||
-        (customer.aadhaar && customer.aadhaar.toLowerCase().includes(lowercasedFilter)) ||
-        customerInvoices.some((invoice) =>
-          invoice.invoiceNumber?.toLowerCase().includes(lowercasedFilter)
-        )
-      );
+        const searchField = customer[searchBy as keyof Customer] as string | undefined;
+        return searchField?.toLowerCase().includes(lowercasedFilter);
     });
-  }, [globalFilter, data, invoices]);
+  }, [searchValue, searchBy, data]);
 
 
   const table = useReactTable({
     data: filteredData,
     columns,
-    state: {
-      globalFilter,
-    },
-    onGlobalFilterChange: setGlobalFilter,
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     getExpandedRowModel: getExpandedRowModel(),
@@ -315,14 +301,26 @@ export default function CustomersPage() {
       <div className="flex items-center justify-between py-4">
         <h1 className="text-2xl font-bold">Customers</h1>
         <div className="flex items-center gap-2">
-            <Input
-              placeholder="Search by name, mobile, aadhaar, invoice..."
-              value={globalFilter ?? ''}
-              onChange={(event) =>
-                setGlobalFilter(event.target.value)
-              }
-              className="max-w-sm"
-            />
+            <div className="flex gap-2">
+                <Select value={searchBy} onValueChange={setSearchBy}>
+                    <SelectTrigger className="w-[150px]">
+                        <SelectValue placeholder="Search by..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="name">Name</SelectItem>
+                        <SelectItem value="mobile">Mobile</SelectItem>
+                        <SelectItem value="aadhaar">Aadhaar Number</SelectItem>
+                    </SelectContent>
+                </Select>
+                <Input
+                placeholder={`Search by ${searchBy}...`}
+                value={searchValue}
+                onChange={(event) =>
+                    setSearchValue(event.target.value)
+                }
+                className="max-w-sm"
+                />
+            </div>
             <Dialog>
               <DialogTrigger asChild>
                 <Button>Add Customer</Button>
@@ -496,5 +494,3 @@ export default function CustomersPage() {
     </div>
   );
 }
-
-    
