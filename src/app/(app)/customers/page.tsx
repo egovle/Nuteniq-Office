@@ -51,14 +51,23 @@ import { PlaceHolderImages } from "@/lib/placeholder-images";
 import Image from "next/image";
 import { Badge } from "@/components/ui/badge";
 import { useCollection, useFirebase, useMemoFirebase } from "@/firebase";
-import { collection, doc, query, where, getDocs } from "firebase/firestore";
+import { collection, doc, query, where, getDocs, updateDoc } from "firebase/firestore";
 import { setDocumentNonBlocking, deleteDocumentNonBlocking, addDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { CalendarIcon } from "lucide-react";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 
 const getImage = (id: string) =>
   PlaceHolderImages.find((img) => img.id === id);
 
-type ServiceItemWithInvoice = InvoiceItem & { invoiceNumber?: string; };
+type ServiceItemWithInvoice = InvoiceItem & { 
+    invoiceId: string;
+    invoiceNumber?: string;
+};
+
 
 const ServicesSubTable = ({ row }: { row: Row<Customer> }) => {
     const { firestore } = useFirebase();
@@ -74,12 +83,28 @@ const ServicesSubTable = ({ row }: { row: Row<Customer> }) => {
     const services = React.useMemo(() => {
         if (!invoices) return [];
         return invoices.flatMap(invoice => 
-            (invoice.items || []).map(item => ({
+            (invoice.items || []).map((item, index) => ({
                 ...item,
-                invoiceNumber: invoice.invoiceNumber
+                invoiceId: invoice.id,
+                invoiceNumber: invoice.invoiceNumber,
+                originalIndex: index
             }))
         );
     }, [invoices]);
+
+    const handleServiceItemUpdate = async (invoiceId: string, itemIndex: number, updatedFields: Partial<InvoiceItem>) => {
+        if (!firestore || !invoices) return;
+
+        const invoiceDocRef = doc(firestore, 'invoices', invoiceId);
+        const invoiceToUpdate = invoices.find(inv => inv.id === invoiceId);
+
+        if (invoiceToUpdate) {
+            const updatedItems = [...invoiceToUpdate.items];
+            updatedItems[itemIndex] = { ...updatedItems[itemIndex], ...updatedFields };
+
+            await updateDoc(invoiceDocRef, { items: updatedItems });
+        }
+    }
 
 
     if (isLoading) {
@@ -110,18 +135,51 @@ const ServicesSubTable = ({ row }: { row: Row<Customer> }) => {
                         <TableRow key={index}>
                             <TableCell>{item.name}</TableCell>
                             <TableCell>{item.invoiceNumber || 'N/A'}</TableCell>
-                            <TableCell>{item.acknowledgmentNumber || 'N/A'}</TableCell>
-                            <TableCell>{item.processedDate || 'N/A'}</TableCell>
                             <TableCell>
-                                {item.status ? (
-                                    <Badge variant={
-                                        item.status === 'Completed' ? 'default' :
-                                        item.status === 'Cancelled by Customer' ? 'destructive' :
-                                        'secondary'
-                                    }>
-                                        {item.status}
-                                    </Badge>
-                                ) : 'N/A'}
+                                <Input 
+                                    defaultValue={item.acknowledgmentNumber || ''}
+                                    onBlur={(e) => handleServiceItemUpdate(item.invoiceId, item.originalIndex, { acknowledgmentNumber: e.target.value })}
+                                    className="h-8"
+                                />
+                            </TableCell>
+                            <TableCell>
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                    <Button
+                                        variant={"outline"}
+                                        className={cn(
+                                        "w-[150px] justify-start text-left font-normal h-8",
+                                        !item.processedDate && "text-muted-foreground"
+                                        )}
+                                    >
+                                        <CalendarIcon className="mr-2 h-4 w-4" />
+                                        {item.processedDate ? format(new Date(item.processedDate), "PPP") : <span>Pick a date</span>}
+                                    </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0">
+                                    <Calendar
+                                        mode="single"
+                                        selected={item.processedDate ? new Date(item.processedDate) : undefined}
+                                        onSelect={(date) => handleServiceItemUpdate(item.invoiceId, item.originalIndex, { processedDate: date?.toISOString() })}
+                                        initialFocus
+                                    />
+                                    </PopoverContent>
+                                </Popover>
+                            </TableCell>
+                            <TableCell>
+                                <Select
+                                    value={item.status || ''}
+                                    onValueChange={(value) => handleServiceItemUpdate(item.invoiceId, item.originalIndex, { status: value as InvoiceItem['status']})}
+                                >
+                                    <SelectTrigger className="w-[180px] h-8">
+                                        <SelectValue placeholder="Select status" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="Under Process">Under Process</SelectItem>
+                                        <SelectItem value="Completed">Completed</SelectItem>
+                                        <SelectItem value="Cancelled by Customer">Cancelled by Customer</SelectItem>
+                                    </SelectContent>
+                                </Select>
                             </TableCell>
                             <TableCell className="text-right">{item.quantity}</TableCell>
                             <TableCell className="text-right">₹{item.price.toFixed(2)}</TableCell>
