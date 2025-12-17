@@ -142,20 +142,18 @@ export default function CustomersPage() {
       e.preventDefault();
       if (!firestore) return;
       const formData = new FormData(e.currentTarget);
+      const newDocRef = doc(collection(firestore, 'customers'));
       const newCustomerData = {
+          id: newDocRef.id,
           name: formData.get('name') as string,
           email: formData.get('email') as string,
-          phone: formData.get('phone') as string,
           mobile: formData.get('mobile') as string,
           aadhaar: formData.get('aadhaar') as string,
           pan: formData.get('pan') as string,
           avatar: `avatar-${(data.length % 6) + 1}`,
       };
       
-      const newDocRef = doc(collection(firestore, 'customers'));
-      const newCustomer = { ...newCustomerData, id: newDocRef.id };
-      
-      setDocumentNonBlocking(newDocRef, newCustomer, {});
+      setDocumentNonBlocking(newDocRef, newCustomerData, {});
   };
   
   const handleUpdateCustomer = (e: React.FormEvent<HTMLFormElement>) => {
@@ -166,7 +164,6 @@ export default function CustomersPage() {
       const updatedData = {
           name: formData.get('name-edit') as string,
           email: formData.get('email-edit') as string,
-          phone: formData.get('phone-edit') as string,
           mobile: formData.get('mobile-edit') as string,
           aadhaar: formData.get('aadhaar-edit') as string,
           pan: formData.get('pan-edit') as string,
@@ -222,8 +219,8 @@ export default function CustomersPage() {
       },
     },
     {
-      accessorKey: "phone",
-      header: "Phone",
+      accessorKey: "mobile",
+      header: "Mobile",
     },
     {
       accessorKey: "aadhaar",
@@ -279,7 +276,7 @@ export default function CustomersPage() {
       );
       return (
         customer.name.toLowerCase().includes(lowercasedFilter) ||
-        (customer.phone && customer.phone.toLowerCase().includes(lowercasedFilter)) ||
+        (customer.mobile && customer.mobile.toLowerCase().includes(lowercasedFilter)) ||
         (customer.aadhaar && customer.aadhaar.toLowerCase().includes(lowercasedFilter)) ||
         customerInvoices.some((invoice) =>
           invoice.invoiceNumber?.toLowerCase().includes(lowercasedFilter)
@@ -308,7 +305,7 @@ export default function CustomersPage() {
         <h1 className="text-2xl font-bold">Customers</h1>
         <div className="flex items-center gap-2">
             <Input
-              placeholder="Search by name, phone, aadhaar, invoice..."
+              placeholder="Search by name, mobile, aadhaar, invoice..."
               value={globalFilter ?? ''}
               onChange={(event) =>
                 setGlobalFilter(event.target.value)
@@ -339,12 +336,6 @@ export default function CustomersPage() {
                         Email
                       </Label>
                       <Input id="email" name="email" type="email" className="col-span-3" />
-                    </div>
-                    <div className="grid grid-cols-4 items-center gap-4">
-                      <Label htmlFor="phone" className="text-right">
-                        Phone
-                      </Label>
-                      <Input id="phone" name="phone" className="col-span-3" />
                     </div>
                     <div className="grid grid-cols-4 items-center gap-4">
                       <Label htmlFor="mobile" className="text-right">
@@ -400,12 +391,6 @@ export default function CustomersPage() {
                 <Input id="email-edit" name="email-edit" type="email" defaultValue={editingCustomer?.email} className="col-span-3" />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="phone-edit" className="text-right">
-                  Phone
-                </Label>
-                <Input id="phone-edit" name="phone-edit" defaultValue={editingCustomer?.phone} className="col-span-3" />
-              </div>
-                <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="mobile-edit" className="text-right">
                     Mobile
                 </Label>

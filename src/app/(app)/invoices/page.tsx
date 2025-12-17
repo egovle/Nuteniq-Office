@@ -122,7 +122,6 @@ export default function InvoicePage() {
         id: customerId,
         name: result.customerName,
         email: '',
-        phone: result.customerPhone || '',
         mobile: result.customerPhone || '',
         avatar: `avatar-${(customers.length % 6) + 1}`,
         aadhaar: result.aadhaarNumber || '',
@@ -133,7 +132,9 @@ export default function InvoicePage() {
       customerId = customer.id;
     }
     
+    const newInvoiceDocRef = doc(collection(firestore, 'invoices'));
     const newInvoiceData = {
+      id: newInvoiceDocRef.id,
       invoiceNumber: result.invoiceNumber,
       customerId: customerId,
       date: result.date,
@@ -141,8 +142,7 @@ export default function InvoicePage() {
       total: result.items?.reduce((acc, item) => acc + item.total, 0) || 0
     };
     
-    const newInvoiceDocRef = doc(collection(firestore, 'invoices'));
-    addDocumentNonBlocking(collection(firestore, 'invoices'), { ...newInvoiceData, id: newInvoiceDocRef.id });
+    addDocumentNonBlocking(collection(firestore, 'invoices'), newInvoiceData);
   
     toast({
       title: "Data Saved!",
@@ -260,7 +260,7 @@ export default function InvoicePage() {
                 />
               </div>
                <div>
-                <Label htmlFor="customerPhone">Customer Phone</Label>
+                <Label htmlFor="customerPhone">Customer Mobile</Label>
                 <Input
                   id="customerPhone"
                   value={result.customerPhone || ""}
