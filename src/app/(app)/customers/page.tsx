@@ -142,7 +142,7 @@ export default function CustomersPage() {
   const { data: customersData, isLoading: isLoadingCustomers } = useCollection<Customer>(customersQuery);
 
   const invoicesQuery = useMemoFirebase(() => firestore ? collection(firestore, 'invoices') : null, [firestore]);
-  const { data: invoicesData } = useCollection(invoicesQuery);
+  const { data: invoicesData } = useCollection<Invoice>(invoicesQuery);
 
   const data = customersData || [];
   const invoices = invoicesData || [];
@@ -496,3 +496,5 @@ export default function CustomersPage() {
     </div>
   );
 }
+
+    
