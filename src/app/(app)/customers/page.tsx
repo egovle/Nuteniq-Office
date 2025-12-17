@@ -287,7 +287,7 @@ const ServiceRow = ({ serviceItem, onUpdate }: { serviceItem: EditableInvoiceIte
 
     return (
         <Collapsible open={isOpen} onOpenChange={setIsOpen} asChild>
-            <>
+            <React.Fragment>
                 <TableRow>
                     <TableCell>
                         <CollapsibleTrigger asChild>
@@ -334,7 +334,7 @@ const ServiceRow = ({ serviceItem, onUpdate }: { serviceItem: EditableInvoiceIte
                         </TableCell>
                     </TableRow>
                 </CollapsibleContent>
-            </>
+            </React.Fragment>
         </Collapsible>
     );
 };
@@ -608,14 +608,14 @@ export default function CustomersPage() {
 
   React.useEffect(() => {
     if (searchValue) {
-      const newExpandedState = filteredData.reduce((acc, c) => {
-        const row = table.getRowModel().rowsById[c.id];
+      const newExpandedState: ExpandedState = {};
+      filteredData.forEach(customer => {
+        const row = table.getRowModel().rowsById[customer.id];
         if (row) {
-          acc[row.index] = true;
+          newExpandedState[row.index] = true;
         }
-        return acc;
-      }, {} as ExpandedState);
-
+      });
+  
       // Only update state if it has actually changed to prevent loops
       if (JSON.stringify(newExpandedState) !== JSON.stringify(expanded)) {
         setExpanded(newExpandedState);
@@ -625,7 +625,8 @@ export default function CustomersPage() {
         setExpanded({});
       }
     }
-  }, [searchValue, filteredData, table, expanded]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchValue, filteredData, expanded]);
 
 
   return (
@@ -827,5 +828,3 @@ export default function CustomersPage() {
     </div>
   );
 }
-
-    
