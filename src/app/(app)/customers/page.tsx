@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -14,6 +15,7 @@ import {
   useReactTable,
   Row,
   getFilteredRowModel,
+  ExpandedState,
 } from "@tanstack/react-table";
 
 import { Button } from "@/components/ui/button";
@@ -391,6 +393,7 @@ export default function CustomersPage() {
   const [searchValue, setSearchValue] = React.useState('');
   const [searchBy, setSearchBy] = React.useState('name');
   const [editingCustomer, setEditingCustomer] = React.useState<Customer | null>(null);
+  const [expanded, setExpanded] = React.useState<ExpandedState>({});
 
   // Force re-render state
   const [refreshKey, setRefreshKey] = React.useState(0);
@@ -589,6 +592,16 @@ export default function CustomersPage() {
     });
   }, [searchValue, searchBy, customers, invoices]);
 
+  React.useEffect(() => {
+    // When filteredData changes, automatically expand all rows.
+    const allRowIds = filteredData.map((_, index) => String(index));
+    const newExpandedState = allRowIds.reduce((acc, id) => {
+      acc[id] = true;
+      return acc;
+    }, {} as ExpandedState);
+    setExpanded(newExpandedState);
+  }, [filteredData]);
+
 
   const table = useReactTable({
     data: filteredData,
@@ -598,8 +611,9 @@ export default function CustomersPage() {
     getExpandedRowModel: getExpandedRowModel(),
     getRowCanExpand: () => true,
     state: {
-       expanded: table.getRowModel().rows.reduce((acc, row) => ({ ...acc, [row.id]: true }), {})
+       expanded,
     },
+    onExpandedChange: setExpanded,
     key: refreshKey,
   });
 
@@ -802,3 +816,5 @@ export default function CustomersPage() {
     </div>
   );
 }
+
+    
