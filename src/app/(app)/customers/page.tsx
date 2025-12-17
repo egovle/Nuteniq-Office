@@ -286,55 +286,75 @@ const ServiceRow = ({ serviceItem, onUpdate }: { serviceItem: EditableInvoiceIte
 
 
     return (
-        <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+        <Collapsible asChild open={isOpen} onOpenChange={setIsOpen}>
+          <React.Fragment>
             <TableRow>
-                <TableCell>
-                    <CollapsibleTrigger asChild>
-                       <Button variant="ghost" size="icon" className="h-8 w-8">
-                        {isOpen ? <ChevronDownIcon className="h-4 w-4" /> : <ChevronRightIcon className="h-4 w-4" />}
-                        <span className="sr-only">Toggle History</span>
-                       </Button>
-                    </CollapsibleTrigger>
-                    {serviceItem.name}
-                </TableCell>
-                <TableCell>{serviceItem.invoiceNumber || 'N/A'}</TableCell>
-                <TableCell>
-                    <Input
-                        value={editableItem.acknowledgmentNumber || ''}
-                        onChange={(e) => handleFieldChange('acknowledgmentNumber', e.target.value)}
-                        className="h-8"
-                    />
-                </TableCell>
-                <TableCell>
-                    {editableItem.processedDate ? format(new Date(editableItem.processedDate), "PPP") : <span className="text-muted-foreground">N/A</span>}
-                </TableCell>
-                <TableCell>
-                    {editableItem.status ? <Badge variant="outline">{editableItem.status}</Badge> : <span className="text-muted-foreground">N/A</span>}
-                </TableCell>
-                <TableCell className="text-right">{serviceItem.quantity}</TableCell>
-                <TableCell className="text-right">₹{serviceItem.price.toFixed(2)}</TableCell>
-                <TableCell className="text-right">₹{serviceItem.total.toFixed(2)}</TableCell>
-                <TableCell>
-                    <Button variant="ghost" size="icon" onClick={handleSave}>
-                        <SaveIcon className="h-4 w-4" />
-                        <span className="sr-only">Save</span>
-                    </Button>
-                </TableCell>
+              <TableCell>
+                <CollapsibleTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                    {isOpen ? (
+                      <ChevronDownIcon className="h-4 w-4" />
+                    ) : (
+                      <ChevronRightIcon className="h-4 w-4" />
+                    )}
+                    <span className="sr-only">Toggle History</span>
+                  </Button>
+                </CollapsibleTrigger>
+                {serviceItem.name}
+              </TableCell>
+              <TableCell>{serviceItem.invoiceNumber || "N/A"}</TableCell>
+              <TableCell>
+                <Input
+                  value={editableItem.acknowledgmentNumber || ""}
+                  onChange={(e) =>
+                    handleFieldChange("acknowledgmentNumber", e.target.value)
+                  }
+                  className="h-8"
+                />
+              </TableCell>
+              <TableCell>
+                {editableItem.processedDate ? (
+                  format(new Date(editableItem.processedDate), "PPP")
+                ) : (
+                  <span className="text-muted-foreground">N/A</span>
+                )}
+              </TableCell>
+              <TableCell>
+                {editableItem.status ? (
+                  <Badge variant="outline">{editableItem.status}</Badge>
+                ) : (
+                  <span className="text-muted-foreground">N/A</span>
+                )}
+              </TableCell>
+              <TableCell className="text-right">{serviceItem.quantity}</TableCell>
+              <TableCell className="text-right">
+                ₹{serviceItem.price.toFixed(2)}
+              </TableCell>
+              <TableCell className="text-right">
+                ₹{serviceItem.total.toFixed(2)}
+              </TableCell>
+              <TableCell>
+                <Button variant="ghost" size="icon" onClick={handleSave}>
+                  <SaveIcon className="h-4 w-4" />
+                  <span className="sr-only">Save</span>
+                </Button>
+              </TableCell>
             </TableRow>
             <CollapsibleContent asChild>
-                <TableRow>
-                    <TableCell colSpan={9}>
-                       <ServiceHistory 
-                         item={serviceItem} 
-                         invoiceId={serviceItem.invoiceId}
-                         originalIndex={serviceItem.originalIndex}
-                         onHistoryUpdate={onUpdate}
-                        />
-                    </TableCell>
-                </TableRow>
+              <TableRow>
+                <TableCell colSpan={9}>
+                  <ServiceHistory
+                    item={serviceItem}
+                    invoiceId={serviceItem.invoiceId}
+                    originalIndex={serviceItem.originalIndex}
+                    onHistoryUpdate={onUpdate}
+                  />
+                </TableCell>
+              </TableRow>
             </CollapsibleContent>
+          </React.Fragment>
         </Collapsible>
-    );
+      );
 };
 
 
@@ -823,5 +843,7 @@ export default function CustomersPage() {
     </div>
   );
 }
+
+    
 
     
