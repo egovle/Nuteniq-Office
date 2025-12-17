@@ -51,8 +51,8 @@ import { PlaceHolderImages } from "@/lib/placeholder-images";
 import Image from "next/image";
 import { Badge } from "@/components/ui/badge";
 import { useCollection, useFirebase, useMemoFirebase } from "@/firebase";
-import { collection, doc, query, where } from "firebase/firestore";
-import { setDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase/non-blocking-updates";
+import { collection, doc, query, where, getDocs } from "firebase/firestore";
+import { setDocumentNonBlocking, deleteDocumentNonBlocking, addDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const getImage = (id: string) =>
@@ -142,10 +142,13 @@ export default function CustomersPage() {
 
   const customersQuery = useMemoFirebase(() => firestore ? collection(firestore, 'customers') : null, [firestore]);
   const { data: customersData, isLoading: isLoadingCustomers } = useCollection<Customer>(customersQuery);
+  const customers = customersData || [];
 
-  const data = customersData || [];
+  const invoicesQuery = useMemoFirebase(() => firestore ? collection(firestore, 'invoices') : null, [firestore]);
+  const { data: invoicesData } = useCollection<Invoice>(invoicesQuery);
+  const invoices = invoicesData || [];
 
-  const handleAddNewCustomer = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleAddNewCustomer = async (e: React.FormEvent<HTMLFormElement>) => {
       e.preventDefault();
       if (!firestore) return;
       const form = e.currentTarget;
@@ -158,14 +161,14 @@ export default function CustomersPage() {
           mobile: formData.get('mobile') as string,
           aadhaar: formData.get('aadhaar') as string,
           pan: formData.get('pan') as string,
-          avatar: `avatar-${(data.length % 6) + 1}`,
+          avatar: `avatar-${(customers.length % 6) + 1}`,
       };
       
-      setDocumentNonBlocking(newDocRef, newCustomerData, {});
+      await setDocumentNonBlocking(newDocRef, newCustomerData, {});
       form.reset();
   };
   
-  const handleUpdateCustomer = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleUpdateCustomer = async (e: React.FormEvent<HTMLFormElement>) => {
       e.preventDefault();
       if (!firestore || !editingCustomer) return;
       
@@ -179,7 +182,7 @@ export default function CustomersPage() {
       };
 
       const docRef = doc(firestore, 'customers', editingCustomer.id);
-      setDocumentNonBlocking(docRef, updatedData, { merge: true });
+      await setDocumentNonBlocking(docRef, updatedData, { merge: true });
       setEditingCustomer(null);
   }
 
@@ -277,14 +280,23 @@ export default function CustomersPage() {
 
   const filteredData = React.useMemo(() => {
     if (!searchValue) {
-      return data;
+      return customers;
     }
     const lowercasedFilter = searchValue.toLowerCase();
-    return data.filter((customer) => {
+
+    if (searchBy === 'invoiceNumber') {
+      const matchingCustomerIds = invoices
+        .filter(invoice => invoice.invoiceNumber?.toLowerCase().includes(lowercasedFilter))
+        .map(invoice => invoice.customerId);
+      const uniqueCustomerIds = [...new Set(matchingCustomerIds)];
+      return customers.filter(customer => uniqueCustomerIds.includes(customer.id));
+    }
+    
+    return customers.filter((customer) => {
         const searchField = customer[searchBy as keyof Customer] as string | undefined;
         return searchField?.toLowerCase().includes(lowercasedFilter);
     });
-  }, [searchValue, searchBy, data]);
+  }, [searchValue, searchBy, customers, invoices]);
 
 
   const table = useReactTable({
@@ -303,17 +315,18 @@ export default function CustomersPage() {
         <div className="flex items-center gap-2">
             <div className="flex gap-2">
                 <Select value={searchBy} onValueChange={setSearchBy}>
-                    <SelectTrigger className="w-[150px]">
+                    <SelectTrigger className="w-[180px]">
                         <SelectValue placeholder="Search by..." />
                     </SelectTrigger>
                     <SelectContent>
                         <SelectItem value="name">Name</SelectItem>
                         <SelectItem value="mobile">Mobile</SelectItem>
                         <SelectItem value="aadhaar">Aadhaar Number</SelectItem>
+                        <SelectItem value="invoiceNumber">Invoice Number</SelectItem>
                     </SelectContent>
                 </Select>
                 <Input
-                placeholder={`Search by ${searchBy}...`}
+                placeholder={`Search by ${searchBy.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}...`}
                 value={searchValue}
                 onChange={(event) =>
                     setSearchValue(event.target.value)
@@ -338,7 +351,7 @@ export default function CustomersPage() {
                       <Label htmlFor="name" className="text-right">
                         Name
                       </Label>
-                      <Input id="name" name="name" className="col-span-3" />
+                      <Input id="name" name="name" className="col-span-3" required/>
                     </div>
                     <div className="grid grid-cols-4 items-center gap-4">
                       <Label htmlFor="email" className="text-right">
@@ -391,7 +404,7 @@ export default function CustomersPage() {
                 <Label htmlFor="name-edit" className="text-right">
                   Name
                 </Label>
-                <Input id="name-edit" name="name-edit" defaultValue={editingCustomer?.name} className="col-span-3" />
+                <Input id="name-edit" name="name-edit" defaultValue={editingCustomer?.name} className="col-span-3" required/>
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="email-edit" className="text-right">
