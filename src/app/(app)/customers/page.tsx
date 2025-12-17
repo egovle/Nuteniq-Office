@@ -405,7 +405,7 @@ export default function CustomersPage() {
                 <Label htmlFor="mobile-edit" className="text-right">
                     Mobile
                 </Label>
-                <Input id="mobile-edit" name="mobile" defaultValue={(editingCustomer as any)?.mobile} className="col-span-3" />
+                <Input id="mobile-edit" name="mobile" defaultValue={editingCustomer?.mobile} className="col-span-3" />
                 </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="aadhaar-edit" className="text-right">
