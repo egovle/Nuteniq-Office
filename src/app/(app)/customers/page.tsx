@@ -142,7 +142,7 @@ export default function CustomersPage() {
       e.preventDefault();
       if (!firestore) return;
       const formData = new FormData(e.currentTarget);
-      const newCustomer = {
+      const newCustomerData = {
           name: formData.get('name') as string,
           email: formData.get('email') as string,
           phone: formData.get('phone') as string,
@@ -151,16 +151,19 @@ export default function CustomersPage() {
           pan: formData.get('pan') as string,
           avatar: `avatar-${(data.length % 6) + 1}`,
       };
+      
       const newDocRef = doc(collection(firestore, 'customers'));
-      addDocumentNonBlocking(collection(firestore, 'customers'), { ...newCustomer, id: newDocRef.id });
+      const newCustomer = { ...newCustomerData, id: newDocRef.id };
+      
+      setDocumentNonBlocking(newDocRef, newCustomer, {});
   };
   
   const handleUpdateCustomer = (e: React.FormEvent<HTMLFormElement>) => {
       e.preventDefault();
       if (!firestore || !editingCustomer) return;
+      
       const formData = new FormData(e.currentTarget);
-      const updatedCustomer = {
-          ...editingCustomer,
+      const updatedData = {
           name: formData.get('name-edit') as string,
           email: formData.get('email-edit') as string,
           phone: formData.get('phone-edit') as string,
@@ -168,8 +171,9 @@ export default function CustomersPage() {
           aadhaar: formData.get('aadhaar-edit') as string,
           pan: formData.get('pan-edit') as string,
       };
+
       const docRef = doc(firestore, 'customers', editingCustomer.id);
-      setDocumentNonBlocking(docRef, updatedCustomer, { merge: true });
+      setDocumentNonBlocking(docRef, updatedData, { merge: true });
       setEditingCustomer(null);
   }
 
@@ -496,5 +500,3 @@ export default function CustomersPage() {
     </div>
   );
 }
-
-    

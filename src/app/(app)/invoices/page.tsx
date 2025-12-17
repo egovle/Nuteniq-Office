@@ -28,9 +28,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { Upload } from "lucide-react";
 import { useCollection, useFirebase, useMemoFirebase } from "@/firebase";
-import { collection, doc } from "firebase/firestore";
-import { addDocumentNonBlocking } from "@/firebase/non-blocking-updates";
-import { type Customer } from "@/lib/data";
+import { collection, doc, query, where, getDocs } from "firebase/firestore";
+import { addDocumentNonBlocking, setDocumentNonBlocking } from "@/firebase/non-blocking-updates";
+import { type Customer, type Invoice } from "@/lib/data";
 
 export default function InvoicePage() {
   const { firestore } = useFirebase();
@@ -45,6 +45,10 @@ export default function InvoicePage() {
   const customersQuery = useMemoFirebase(() => firestore ? collection(firestore, 'customers') : null, [firestore]);
   const { data: customersData } = useCollection<Customer>(customersQuery);
   const customers = customersData || [];
+
+  const invoicesQuery = useMemoFirebase(() => firestore ? collection(firestore, 'invoices') : null, [firestore]);
+  const { data: invoicesData } = useCollection<Invoice>(invoicesQuery);
+  const invoices = invoicesData || [];
 
   const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -90,15 +94,31 @@ export default function InvoicePage() {
     fileInputRef.current?.click();
   };
 
-  const handleSaveData = () => {
+  const handleSaveData = async () => {
     if (!result || !firestore) return;
-
+  
+    // Check for duplicate invoice number for any customer
+    if (result.invoiceNumber) {
+      const duplicateQuery = query(collection(firestore, 'invoices'), where('invoiceNumber', '==', result.invoiceNumber));
+      const duplicateSnapshot = await getDocs(duplicateQuery);
+      if (!duplicateSnapshot.empty) {
+        toast({
+          variant: "destructive",
+          title: "Duplicate Invoice",
+          description: `An invoice with the number ${result.invoiceNumber} already exists.`,
+        });
+        return;
+      }
+    }
+  
     let customer = customers.find(c => c.name.toLowerCase() === result.customerName.toLowerCase());
     let customerId;
-
+  
     if (!customer) {
-      customerId = doc(collection(firestore, 'customers')).id;
-      addDocumentNonBlocking(collection(firestore, 'customers'), {
+      // Create a new customer if not found
+      const newCustomerDocRef = doc(collection(firestore, 'customers'));
+      customerId = newCustomerDocRef.id;
+      const newCustomerData = {
         id: customerId,
         name: result.customerName,
         email: '',
@@ -107,32 +127,33 @@ export default function InvoicePage() {
         avatar: `avatar-${(customers.length % 6) + 1}`,
         aadhaar: result.aadhaarNumber || '',
         pan: ''
-      });
+      };
+      setDocumentNonBlocking(newCustomerDocRef, newCustomerData, {});
     } else {
-        customerId = customer.id;
+      customerId = customer.id;
     }
     
-    const newInvoice = {
-        invoiceNumber: result.invoiceNumber,
-        customerId: customerId,
-        date: result.date,
-        items: result.items || [],
-        total: result.items?.reduce((acc, item) => acc + item.total, 0) || 0
+    const newInvoiceData = {
+      invoiceNumber: result.invoiceNumber,
+      customerId: customerId,
+      date: result.date,
+      items: result.items || [],
+      total: result.items?.reduce((acc, item) => acc + item.total, 0) || 0
     };
     
-    const newDocRef = doc(collection(firestore, 'invoices'));
-    addDocumentNonBlocking(collection(firestore, 'invoices'), { ...newInvoice, id: newDocRef.id });
-
+    const newInvoiceDocRef = doc(collection(firestore, 'invoices'));
+    addDocumentNonBlocking(collection(firestore, 'invoices'), { ...newInvoiceData, id: newInvoiceDocRef.id });
+  
     toast({
-        title: "Data Saved!",
-        description: `Invoice ${result.invoiceNumber} has been saved.`
-    })
-
+      title: "Data Saved!",
+      description: `Invoice ${result.invoiceNumber || 'N/A'} has been saved.`
+    });
+  
     // Reset state after saving
     setResult(null);
     setPreview(null);
-    if(fileInputRef.current) {
-        fileInputRef.current.value = "";
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
     }
   };
 
