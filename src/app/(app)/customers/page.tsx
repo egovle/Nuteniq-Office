@@ -4,7 +4,8 @@ import * as React from "react";
 import {
   DotsHorizontalIcon,
   ChevronDownIcon,
-  ChevronRightIcon
+  ChevronRightIcon,
+  PlusCircle,
 } from "@radix-ui/react-icons";
 import {
   ColumnDef,
@@ -45,27 +46,198 @@ import {
   DialogClose,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { type Customer, type InvoiceItem, type Invoice } from "@/lib/data";
+import { type Customer, type InvoiceItem, type Invoice, type StatusHistory } from "@/lib/data";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { PlaceHolderImages } from "@/lib/placeholder-images";
 import Image from "next/image";
-import { Badge } from "@/components/ui/badge";
 import { useCollection, useFirebase, useMemoFirebase } from "@/firebase";
 import { collection, doc, query, where, getDocs, updateDoc } from "firebase/firestore";
 import { setDocumentNonBlocking, deleteDocumentNonBlocking, addDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { CalendarIcon } from "lucide-react";
+import { CalendarIcon, SaveIcon } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
 const getImage = (id: string) =>
   PlaceHolderImages.find((img) => img.id === id);
 
-type ServiceItemWithInvoice = InvoiceItem & { 
-    invoiceId: string;
-    invoiceNumber?: string;
+type EditableInvoiceItem = InvoiceItem & { originalIndex: number, invoiceId: string };
+
+const ServiceHistory = ({ item }: { item: EditableInvoiceItem }) => {
+    return (
+      <div className="p-2 bg-muted/20">
+        <h4 className="text-sm font-semibold mb-2">Status History</h4>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Status</TableHead>
+              <TableHead>Date Changed</TableHead>
+              <TableHead>Acknowledgment No.</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {item.statusHistory?.map((history, index) => (
+              <TableRow key={index}>
+                <TableCell>{history.status}</TableCell>
+                <TableCell>{format(new Date(history.date), "PPP")}</TableCell>
+                <TableCell>{item.acknowledgmentNumber}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    );
+};
+
+const ServiceRow = ({ serviceItem, invoices }: { serviceItem: EditableInvoiceItem, invoices: Invoice[] | null }) => {
+    const { firestore } = useFirebase();
+    const { toast } = useToast();
+    const [isHistoryOpen, setIsHistoryOpen] = React.useState(false);
+
+    const [editableItem, setEditableItem] = React.useState<Partial<InvoiceItem>>({
+        acknowledgmentNumber: serviceItem.acknowledgmentNumber || '',
+        processedDate: serviceItem.processedDate,
+        status: serviceItem.status || undefined,
+    });
+
+    const handleFieldChange = <K extends keyof InvoiceItem>(field: K, value: InvoiceItem[K]) => {
+        setEditableItem(prev => ({ ...prev, [field]: value }));
+    };
+
+    const handleSave = async () => {
+        if (!firestore || !invoices) return;
+
+        const invoiceDocRef = doc(firestore, 'invoices', serviceItem.invoiceId);
+        const invoiceToUpdate = invoices.find(inv => inv.id === serviceItem.invoiceId);
+
+        if (invoiceToUpdate) {
+            const updatedItems = [...invoiceToUpdate.items];
+            const originalItem = updatedItems[serviceItem.originalIndex];
+
+            const newStatusHistoryEntry: StatusHistory | undefined = editableItem.status ? {
+                status: editableItem.status,
+                date: editableItem.processedDate || new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+            } : undefined;
+
+            const updatedStatusHistory = newStatusHistoryEntry
+                ? [...(originalItem.statusHistory || []), newStatusHistoryEntry]
+                : originalItem.statusHistory;
+
+            updatedItems[serviceItem.originalIndex] = {
+                ...originalItem,
+                acknowledgmentNumber: editableItem.acknowledgmentNumber,
+                processedDate: editableItem.processedDate,
+                status: editableItem.status,
+                statusHistory: updatedStatusHistory,
+            };
+
+            try {
+                await updateDoc(invoiceDocRef, { items: updatedItems });
+                toast({
+                    title: "Service Updated",
+                    description: "The service details have been saved successfully.",
+                });
+            } catch (error) {
+                console.error("Error updating service:", error);
+                toast({
+                    variant: "destructive",
+                    title: "Update Failed",
+                    description: "Could not save the service details.",
+                });
+            }
+        }
+    };
+
+
+    return (
+        <Collapsible asChild>
+            <>
+                <TableRow>
+                    <TableCell>
+                    <CollapsibleTrigger asChild>
+                        <Button variant="ghost" size="sm">
+                            {isHistoryOpen ? <ChevronDownIcon /> : <ChevronRightIcon />}
+                            <span className="sr-only">Toggle History</span>
+                        </Button>
+                    </CollapsibleTrigger>
+                        {serviceItem.name}
+                    </TableCell>
+                    <TableCell>{serviceItem.invoiceNumber || 'N/A'}</TableCell>
+                    <TableCell>
+                        <Input
+                            value={editableItem.acknowledgmentNumber || ''}
+                            onChange={(e) => handleFieldChange('acknowledgmentNumber', e.target.value)}
+                            className="h-8"
+                        />
+                    </TableCell>
+                    <TableCell>
+                        <Popover>
+                            <PopoverTrigger asChild>
+                                <Button
+                                    variant={"outline"}
+                                    className={cn(
+                                        "w-[150px] justify-start text-left font-normal h-8",
+                                        !editableItem.processedDate && "text-muted-foreground"
+                                    )}
+                                >
+                                    <CalendarIcon className="mr-2 h-4 w-4" />
+                                    {editableItem.processedDate ? format(new Date(editableItem.processedDate), "PPP") : <span>Pick a date</span>}
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0">
+                                <Calendar
+                                    mode="single"
+                                    selected={editableItem.processedDate ? new Date(editableItem.processedDate) : undefined}
+                                    onSelect={(date) => handleFieldChange('processedDate', date?.toISOString())}
+                                    initialFocus
+                                />
+                            </PopoverContent>
+                        </Popover>
+                    </TableCell>
+                    <TableCell>
+                        <Select
+                            value={editableItem.status || ''}
+                            onValueChange={(value) => handleFieldChange('status', value as InvoiceItem['status'])}
+                        >
+                            <SelectTrigger className="w-[180px] h-8">
+                                <SelectValue placeholder="Select status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="Under Process">Under Process</SelectItem>
+                                <SelectItem value="Completed">Completed</SelectItem>
+                                <SelectItem value="Cancelled by Customer">Cancelled by Customer</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </TableCell>
+                    <TableCell className="text-right">{serviceItem.quantity}</TableCell>
+                    <TableCell className="text-right">₹{serviceItem.price.toFixed(2)}</TableCell>
+                    <TableCell className="text-right">₹{serviceItem.total.toFixed(2)}</TableCell>
+                    <TableCell>
+                        <Button variant="ghost" size="icon" onClick={handleSave}>
+                            <SaveIcon className="h-4 w-4" />
+                            <span className="sr-only">Save</span>
+                        </Button>
+                    </TableCell>
+                </TableRow>
+                <CollapsibleContent asChild>
+                    <TableRow>
+                        <TableCell colSpan={9}>
+                            <ServiceHistory item={{...serviceItem, ...editableItem}} />
+                        </TableCell>
+                    </TableRow>
+                </CollapsibleContent>
+            </>
+        </Collapsible>
+    );
 };
 
 
@@ -80,9 +252,9 @@ const ServicesSubTable = ({ row }: { row: Row<Customer> }) => {
 
     const { data: invoices, isLoading } = useCollection<Invoice>(invoicesQuery);
 
-    const services = React.useMemo(() => {
+    const services = React.useMemo((): EditableInvoiceItem[] => {
         if (!invoices) return [];
-        return invoices.flatMap(invoice => 
+        return invoices.flatMap(invoice =>
             (invoice.items || []).map((item, index) => ({
                 ...item,
                 invoiceId: invoice.id,
@@ -91,20 +263,6 @@ const ServicesSubTable = ({ row }: { row: Row<Customer> }) => {
             }))
         );
     }, [invoices]);
-
-    const handleServiceItemUpdate = async (invoiceId: string, itemIndex: number, updatedFields: Partial<InvoiceItem>) => {
-        if (!firestore || !invoices) return;
-
-        const invoiceDocRef = doc(firestore, 'invoices', invoiceId);
-        const invoiceToUpdate = invoices.find(inv => inv.id === invoiceId);
-
-        if (invoiceToUpdate) {
-            const updatedItems = [...invoiceToUpdate.items];
-            updatedItems[itemIndex] = { ...updatedItems[itemIndex], ...updatedFields };
-
-            await updateDoc(invoiceDocRef, { items: updatedItems });
-        }
-    }
 
 
     if (isLoading) {
@@ -128,63 +286,12 @@ const ServicesSubTable = ({ row }: { row: Row<Customer> }) => {
                         <TableHead className="text-right">Quantity</TableHead>
                         <TableHead className="text-right">Price</TableHead>
                         <TableHead className="text-right">Total</TableHead>
+                        <TableHead></TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
                     {services.map((item, index) => (
-                        <TableRow key={index}>
-                            <TableCell>{item.name}</TableCell>
-                            <TableCell>{item.invoiceNumber || 'N/A'}</TableCell>
-                            <TableCell>
-                                <Input 
-                                    defaultValue={item.acknowledgmentNumber || ''}
-                                    onBlur={(e) => handleServiceItemUpdate(item.invoiceId, item.originalIndex, { acknowledgmentNumber: e.target.value })}
-                                    className="h-8"
-                                />
-                            </TableCell>
-                            <TableCell>
-                                <Popover>
-                                    <PopoverTrigger asChild>
-                                    <Button
-                                        variant={"outline"}
-                                        className={cn(
-                                        "w-[150px] justify-start text-left font-normal h-8",
-                                        !item.processedDate && "text-muted-foreground"
-                                        )}
-                                    >
-                                        <CalendarIcon className="mr-2 h-4 w-4" />
-                                        {item.processedDate ? format(new Date(item.processedDate), "PPP") : <span>Pick a date</span>}
-                                    </Button>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-auto p-0">
-                                    <Calendar
-                                        mode="single"
-                                        selected={item.processedDate ? new Date(item.processedDate) : undefined}
-                                        onSelect={(date) => handleServiceItemUpdate(item.invoiceId, item.originalIndex, { processedDate: date?.toISOString() })}
-                                        initialFocus
-                                    />
-                                    </PopoverContent>
-                                </Popover>
-                            </TableCell>
-                            <TableCell>
-                                <Select
-                                    value={item.status || ''}
-                                    onValueChange={(value) => handleServiceItemUpdate(item.invoiceId, item.originalIndex, { status: value as InvoiceItem['status']})}
-                                >
-                                    <SelectTrigger className="w-[180px] h-8">
-                                        <SelectValue placeholder="Select status" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="Under Process">Under Process</SelectItem>
-                                        <SelectItem value="Completed">Completed</SelectItem>
-                                        <SelectItem value="Cancelled by Customer">Cancelled by Customer</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </TableCell>
-                            <TableCell className="text-right">{item.quantity}</TableCell>
-                            <TableCell className="text-right">₹{item.price.toFixed(2)}</TableCell>
-                            <TableCell className="text-right">₹{item.total.toFixed(2)}</TableCell>
-                        </TableRow>
+                       <ServiceRow key={`${item.invoiceId}-${item.originalIndex}`} serviceItem={item} invoices={invoices} />
                     ))}
                 </TableBody>
             </Table>
@@ -194,6 +301,7 @@ const ServicesSubTable = ({ row }: { row: Row<Customer> }) => {
 
 export default function CustomersPage() {
   const { firestore } = useFirebase();
+  const { toast } = useToast();
   const [searchValue, setSearchValue] = React.useState('');
   const [searchBy, setSearchBy] = React.useState('name');
   const [editingCustomer, setEditingCustomer] = React.useState<Customer | null>(null);
@@ -211,9 +319,8 @@ export default function CustomersPage() {
       if (!firestore) return;
       const form = e.currentTarget;
       const formData = new FormData(form);
-      const newDocRef = doc(collection(firestore, 'customers'));
+      
       const newCustomerData = {
-          id: newDocRef.id,
           name: formData.get('name') as string,
           email: formData.get('email') as string,
           mobile: formData.get('mobile') as string,
@@ -222,8 +329,21 @@ export default function CustomersPage() {
           avatar: `avatar-${(customers.length % 6) + 1}`,
       };
       
-      await setDocumentNonBlocking(newDocRef, newCustomerData, {});
-      form.reset();
+      try {
+        await addDocumentNonBlocking(collection(firestore, 'customers'), newCustomerData);
+        toast({
+          title: "Customer Added",
+          description: `${newCustomerData.name} has been added successfully.`,
+        });
+        form.reset();
+      } catch(error) {
+        console.error("Error adding customer: ", error);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to add new customer.",
+        });
+      }
   };
   
   const handleUpdateCustomer = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -240,13 +360,30 @@ export default function CustomersPage() {
       };
 
       const docRef = doc(firestore, 'customers', editingCustomer.id);
-      await setDocumentNonBlocking(docRef, updatedData, { merge: true });
-      setEditingCustomer(null);
+      try {
+        await setDocumentNonBlocking(docRef, updatedData, { merge: true });
+        toast({
+          title: "Customer Updated",
+          description: "Customer details have been updated successfully.",
+        });
+        setEditingCustomer(null);
+      } catch (error) {
+        console.error("Error updating customer: ", error);
+        toast({
+          variant: "destructive",
+          title: "Update Failed",
+          description: "Could not update customer details.",
+        });
+      }
   }
 
   const handleDeleteCustomer = (customerId: string) => {
     if (!firestore) return;
     deleteDocumentNonBlocking(doc(firestore, 'customers', customerId));
+    toast({
+        title: "Customer Deleted",
+        description: "The customer has been deleted.",
+      });
   }
 
   const columns: ColumnDef<Customer>[] = [
@@ -277,7 +414,7 @@ export default function CustomersPage() {
             <Avatar>
               {avatar && <Image src={avatar.imageUrl} alt={customer.name} width={40} height={40} data-ai-hint={avatar.imageHint} />}
               <AvatarFallback>
-                {customer.name.charAt(0)}
+                {customer.name.split(' ').map(n => n[0]).join('')}
               </AvatarFallback>
             </Avatar>
             <span className="font-medium">{customer.name}</span>

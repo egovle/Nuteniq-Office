@@ -22,7 +22,7 @@ export type Customer = {
 };
 
 export type Employee = {
-  id: string;
+  id:string;
   name: string;
   email: string;
   role: string;
@@ -30,6 +30,12 @@ export type Employee = {
   skills: string[];
   workload: number;
   availability: boolean;
+};
+
+export type StatusHistory = {
+  status: 'Under Process' | 'Completed' | 'Cancelled by Customer';
+  date: string;
+  updatedAt: string;
 };
 
 export type InvoiceItem = {
@@ -40,6 +46,7 @@ export type InvoiceItem = {
   acknowledgmentNumber?: string;
   processedDate?: string;
   status?: 'Under Process' | 'Completed' | 'Cancelled by Customer';
+  statusHistory?: StatusHistory[];
 };
 
 export type Invoice = {
