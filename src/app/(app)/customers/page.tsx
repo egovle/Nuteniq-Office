@@ -592,25 +592,6 @@ export default function CustomersPage() {
     });
   }, [searchValue, searchBy, customers, invoices]);
 
-  React.useEffect(() => {
-    // When filteredData changes, automatically expand all rows if there's a search value.
-    if (searchValue) {
-        const allRowIds = filteredData.map((c) => c.id);
-        const newExpandedState = allRowIds.reduce((acc, id) => {
-          // Find the index of the customer in the original `data` array for the table
-          const rowIndex = table.getRowModel().rows.findIndex(row => row.original.id === id);
-          if (rowIndex !== -1) {
-            acc[String(rowIndex)] = true;
-          }
-          return acc;
-        }, {} as ExpandedState);
-        setExpanded(newExpandedState);
-    } else {
-        setExpanded({});
-    }
-  }, [searchValue, filteredData]);
-
-
   const table = useReactTable({
     data: filteredData,
     columns,
@@ -624,6 +605,28 @@ export default function CustomersPage() {
     onExpandedChange: setExpanded,
     key: refreshKey,
   });
+
+  React.useEffect(() => {
+    if (searchValue) {
+      const newExpandedState = filteredData.reduce((acc, c) => {
+        const row = table.getRowModel().rowsById[c.id];
+        if (row) {
+          acc[row.index] = true;
+        }
+        return acc;
+      }, {} as ExpandedState);
+
+      // Only update state if it has actually changed to prevent loops
+      if (JSON.stringify(newExpandedState) !== JSON.stringify(expanded)) {
+        setExpanded(newExpandedState);
+      }
+    } else {
+      if (Object.keys(expanded).length > 0) {
+        setExpanded({});
+      }
+    }
+  }, [searchValue, filteredData, table, expanded]);
+
 
   return (
     <div className="w-full">
