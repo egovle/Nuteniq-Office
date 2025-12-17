@@ -50,7 +50,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { PlaceHolderImages } from "@/lib/placeholder-images";
 import Image from "next/image";
 import { useCollection, useFirebase, useMemoFirebase } from "@/firebase";
-import { collection, doc, updateDoc } from "firebase/firestore";
+import { collection, doc, setDoc, deleteDoc, getDoc } from "firebase/firestore";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
@@ -64,6 +64,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
 
 const getImage = (id: string) =>
   PlaceHolderImages.find((img) => img.id === id);
@@ -77,6 +78,12 @@ const ServiceHistory = ({ item, invoiceId, originalIndex, onHistoryUpdate }: { i
     const [newStatus, setNewStatus] = React.useState<StatusHistory['status'] | ''>('');
     const [newDate, setNewDate] = React.useState<Date | undefined>(new Date());
     const [newNotes, setNewNotes] = React.useState('');
+    const [isCalendarOpen, setIsCalendarOpen] = React.useState(false);
+
+    const lastUpdateDate = React.useMemo(() => {
+        if (!item.statusHistory || item.statusHistory.length === 0) return undefined;
+        return new Date(item.statusHistory[item.statusHistory.length - 1].date);
+    }, [item.statusHistory]);
 
     const handleAddHistory = async () => {
         if (!firestore || !newStatus || !newDate) return;
@@ -88,33 +95,35 @@ const ServiceHistory = ({ item, invoiceId, originalIndex, onHistoryUpdate }: { i
             notes: newNotes,
         };
 
-        const updatedHistory = [...(item.statusHistory || []), newHistoryEntry];
         const invoiceDocRef = doc(firestore, 'invoices', invoiceId);
         
         try {
-            // This is a bit tricky. We need to update a specific item in an array.
-            // Firestore doesn't support this directly, so we read, update, and write back.
-            // For this app, we assume we have the full `item` object and can construct the new array.
-            const invoiceToUpdate = (await (await fetch(`/api/invoices/${invoiceId}`)).json()) as Invoice
-            if (invoiceToUpdate) {
-                const updatedItems = [...invoiceToUpdate.items];
-                updatedItems[originalIndex] = {
-                    ...updatedItems[originalIndex],
-                    statusHistory: updatedHistory,
-                    // also update the top-level fields for display
-                    status: newHistoryEntry.status,
-                    processedDate: newHistoryEntry.date,
-                };
-                await updateDoc(invoiceDocRef, { items: updatedItems });
-                toast({
-                    title: "History Added",
-                    description: "The status history has been updated.",
-                });
-                onHistoryUpdate(); // a function to trigger re-fetch/re-render
-                setIsAdding(false);
-                setNewStatus('');
-                setNewDate(new Date());
-                setNewNotes('');
+            const docSnap = await getDoc(invoiceDocRef);
+            if (docSnap.exists()) {
+                const invoiceData = docSnap.data() as Invoice;
+                const updatedItems = [...(invoiceData.items || [])];
+                const currentItem = updatedItems[originalIndex];
+
+                if (currentItem) {
+                    const updatedHistory = [...(currentItem.statusHistory || []), newHistoryEntry];
+                    updatedItems[originalIndex] = {
+                        ...currentItem,
+                        statusHistory: updatedHistory,
+                        // also update the top-level fields for display
+                        status: newHistoryEntry.status,
+                        processedDate: newHistoryEntry.date,
+                    };
+                    await setDoc(invoiceDocRef, { items: updatedItems }, { merge: true });
+                    toast({
+                        title: "History Added",
+                        description: "The status history has been updated.",
+                    });
+                    onHistoryUpdate(); // a function to trigger re-fetch/re-render
+                    setIsAdding(false);
+                    setNewStatus('');
+                    setNewDate(new Date());
+                    setNewNotes('');
+                }
             }
         } catch(error) {
             console.error("Error adding history:", error);
@@ -166,7 +175,7 @@ const ServiceHistory = ({ item, invoiceId, originalIndex, onHistoryUpdate }: { i
                         <SelectItem value="Cancelled by Customer">Cancelled by Customer</SelectItem>
                     </SelectContent>
                 </Select>
-                <Popover>
+                <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
                     <PopoverTrigger asChild>
                         <Button
                             variant={"outline"}
@@ -177,7 +186,16 @@ const ServiceHistory = ({ item, invoiceId, originalIndex, onHistoryUpdate }: { i
                         </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0">
-                        <Calendar mode="single" selected={newDate} onSelect={setNewDate} initialFocus />
+                        <Calendar 
+                            mode="single" 
+                            selected={newDate} 
+                            onSelect={(date) => {
+                                setNewDate(date);
+                                setIsCalendarOpen(false);
+                            }} 
+                            disabled={(date) => date > new Date() || (lastUpdateDate ? date <= lastUpdateDate : false)}
+                            initialFocus 
+                        />
                     </PopoverContent>
                 </Popover>
                 <Textarea 
@@ -203,13 +221,12 @@ const ServiceRow = ({ serviceItem, onUpdate }: { serviceItem: EditableInvoiceIte
     const { firestore } = useFirebase();
     const { toast } = useToast();
     const [isOpen, setIsOpen] = React.useState(false);
-    const [isHistoryOpen, setIsHistoryOpen] = React.useState(false);
 
     // Get latest status from history or use top-level fields
     const latestStatus = serviceItem.statusHistory?.[serviceItem.statusHistory.length - 1];
 
     const [editableItem, setEditableItem] = React.useState<Partial<InvoiceItem>>({
-        acknowledgmentNumber: serviceItem.acknowledgmentNumber || latestStatus?.status || '',
+        acknowledgmentNumber: serviceItem.acknowledgmentNumber || '',
         processedDate: serviceItem.processedDate || latestStatus?.date,
         status: serviceItem.status || latestStatus?.status,
     });
@@ -235,11 +252,9 @@ const ServiceRow = ({ serviceItem, onUpdate }: { serviceItem: EditableInvoiceIte
         const invoiceDocRef = doc(firestore, 'invoices', serviceItem.invoiceId);
     
         try {
-            // To update an item in an array, we must read the whole array,
-            // update it in memory, and then write the entire array back.
-            const docSnap = await (await fetch(`/api/invoices/${serviceItem.invoiceId}`)).json() as Invoice;
-            if (docSnap) {
-                const invoiceData = docSnap;
+            const docSnap = await getDoc(invoiceDocRef);
+            if (docSnap.exists()) {
+                const invoiceData = docSnap.data() as Invoice;
                 const updatedItems = [...(invoiceData.items || [])];
                 const itemToUpdate = updatedItems[serviceItem.originalIndex];
     
@@ -247,11 +262,9 @@ const ServiceRow = ({ serviceItem, onUpdate }: { serviceItem: EditableInvoiceIte
                     updatedItems[serviceItem.originalIndex] = {
                         ...itemToUpdate,
                         acknowledgmentNumber: editableItem.acknowledgmentNumber,
-                        // Note: We don't update status/date directly here anymore
-                        // They are derived from the latest statusHistory entry.
                     };
     
-                    await updateDoc(invoiceDocRef, { items: updatedItems });
+                    await setDoc(invoiceDocRef, { items: updatedItems }, { merge: true });
                     toast({
                         title: "Service Updated",
                         description: "The acknowledgment number has been saved.",
@@ -398,18 +411,18 @@ export default function CustomersPage() {
       const formData = new FormData(form);
       
       const newCustomerRef = doc(collection(firestore, 'customers'));
-      const newCustomerData = {
+      const newCustomerData: Customer = {
+          id: newCustomerRef.id,
           name: formData.get('name') as string,
           email: formData.get('email') as string,
           mobile: formData.get('mobile') as string,
           aadhaar: formData.get('aadhaar') as string,
           pan: formData.get('pan') as string,
           avatar: `avatar-${(customers.length % 6) + 1}`,
-          id: newCustomerRef.id,
       };
       
       try {
-        await (await fetch(`/api/customers`, { method: 'POST', body: JSON.stringify(newCustomerData) })).json();
+        await setDoc(newCustomerRef, newCustomerData);
         toast({
           title: "Customer Added",
           description: `${newCustomerData.name} has been added successfully.`,
@@ -431,7 +444,7 @@ export default function CustomersPage() {
       if (!firestore || !editingCustomer) return;
       
       const formData = new FormData(e.currentTarget);
-      const updatedData = {
+      const updatedData: Partial<Customer> = {
           name: formData.get('name-edit') as string,
           email: formData.get('email-edit') as string,
           mobile: formData.get('mobile-edit') as string,
@@ -439,8 +452,10 @@ export default function CustomersPage() {
           pan: formData.get('pan-edit') as string,
       };
 
+      const customerDocRef = doc(firestore, 'customers', editingCustomer.id);
+
       try {
-        await (await fetch(`/api/customers/${editingCustomer.id}`, { method: 'PUT', body: JSON.stringify(updatedData) })).json();
+        await setDoc(customerDocRef, updatedData, { merge: true });
         toast({
           title: "Customer Updated",
           description: "Customer details have been updated successfully.",
@@ -459,7 +474,7 @@ export default function CustomersPage() {
 
   const handleDeleteCustomer = async (customerId: string) => {
     if (!firestore) return;
-    await fetch(`/api/customers/${customerId}`, { method: 'DELETE' });
+    await deleteDoc(doc(firestore, 'customers', customerId));
     toast({
         title: "Customer Deleted",
         description: "The customer has been deleted.",
@@ -582,6 +597,9 @@ export default function CustomersPage() {
     getFilteredRowModel: getFilteredRowModel(),
     getExpandedRowModel: getExpandedRowModel(),
     getRowCanExpand: () => true,
+    state: {
+       expanded: table.getRowModel().rows.reduce((acc, row) => ({ ...acc, [row.id]: true }), {})
+    },
     key: refreshKey,
   });
 
@@ -667,7 +685,7 @@ export default function CustomersPage() {
       </div>
       
       {/* Edit Customer Dialog */}
-      <Dialog open={!!editingCustomer} onOpenChange={() => setEditingCustomer(null)}>
+      <Dialog open={!!editingCustomer} onOpenChange={(isOpen) => !isOpen && setEditingCustomer(null)}>
         <DialogContent className="sm:max-w-[425px]">
           <form onSubmit={handleUpdateCustomer}>
             <DialogHeader>
