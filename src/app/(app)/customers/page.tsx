@@ -594,13 +594,17 @@ export default function CustomersPage() {
 
   React.useEffect(() => {
     // When filteredData changes, automatically expand all rows.
-    const allRowIds = filteredData.map((_, index) => String(index));
-    const newExpandedState = allRowIds.reduce((acc, id) => {
-      acc[id] = true;
-      return acc;
-    }, {} as ExpandedState);
-    setExpanded(newExpandedState);
-  }, [filteredData]);
+    if (searchValue) {
+        const allRowIds = filteredData.map((_, index) => String(index));
+        const newExpandedState = allRowIds.reduce((acc, id) => {
+          acc[id] = true;
+          return acc;
+        }, {} as ExpandedState);
+        setExpanded(newExpandedState);
+    } else {
+        setExpanded({});
+    }
+  }, [searchValue, filteredData]);
 
 
   const table = useReactTable({
@@ -816,5 +820,3 @@ export default function CustomersPage() {
     </div>
   );
 }
-
-    
