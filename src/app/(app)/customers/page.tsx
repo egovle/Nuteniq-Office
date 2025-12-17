@@ -5,7 +5,6 @@ import {
   DotsHorizontalIcon,
   ChevronDownIcon,
   ChevronRightIcon,
-  PlusCircle,
 } from "@radix-ui/react-icons";
 import {
   ColumnDef,
@@ -51,8 +50,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { PlaceHolderImages } from "@/lib/placeholder-images";
 import Image from "next/image";
 import { useCollection, useFirebase, useMemoFirebase } from "@/firebase";
-import { collection, doc, query, where, getDocs, updateDoc } from "firebase/firestore";
-import { setDocumentNonBlocking, deleteDocumentNonBlocking, addDocumentNonBlocking } from "@/firebase/non-blocking-updates";
+import { collection, doc, updateDoc } from "firebase/firestore";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
@@ -65,22 +63,78 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { Textarea } from "@/components/ui/textarea";
 
 const getImage = (id: string) =>
   PlaceHolderImages.find((img) => img.id === id);
 
 type EditableInvoiceItem = InvoiceItem & { originalIndex: number, invoiceId: string };
 
-const ServiceHistory = ({ item }: { item: EditableInvoiceItem }) => {
+const ServiceHistory = ({ item, invoiceId, originalIndex, onHistoryUpdate }: { item: EditableInvoiceItem, invoiceId: string, originalIndex: number, onHistoryUpdate: () => void }) => {
+    const { firestore } = useFirebase();
+    const { toast } = useToast();
+    const [isAdding, setIsAdding] = React.useState(false);
+    const [newStatus, setNewStatus] = React.useState<StatusHistory['status'] | ''>('');
+    const [newDate, setNewDate] = React.useState<Date | undefined>(new Date());
+    const [newNotes, setNewNotes] = React.useState('');
+
+    const handleAddHistory = async () => {
+        if (!firestore || !newStatus || !newDate) return;
+
+        const newHistoryEntry: StatusHistory = {
+            status: newStatus,
+            date: newDate.toISOString(),
+            updatedAt: new Date().toISOString(),
+            notes: newNotes,
+        };
+
+        const updatedHistory = [...(item.statusHistory || []), newHistoryEntry];
+        const invoiceDocRef = doc(firestore, 'invoices', invoiceId);
+        
+        try {
+            // This is a bit tricky. We need to update a specific item in an array.
+            // Firestore doesn't support this directly, so we read, update, and write back.
+            // For this app, we assume we have the full `item` object and can construct the new array.
+            const invoiceToUpdate = (await (await fetch(`/api/invoices/${invoiceId}`)).json()) as Invoice
+            if (invoiceToUpdate) {
+                const updatedItems = [...invoiceToUpdate.items];
+                updatedItems[originalIndex] = {
+                    ...updatedItems[originalIndex],
+                    statusHistory: updatedHistory,
+                    // also update the top-level fields for display
+                    status: newHistoryEntry.status,
+                    processedDate: newHistoryEntry.date,
+                };
+                await updateDoc(invoiceDocRef, { items: updatedItems });
+                toast({
+                    title: "History Added",
+                    description: "The status history has been updated.",
+                });
+                onHistoryUpdate(); // a function to trigger re-fetch/re-render
+                setIsAdding(false);
+                setNewStatus('');
+                setNewDate(new Date());
+                setNewNotes('');
+            }
+        } catch(error) {
+            console.error("Error adding history:", error);
+            toast({
+                variant: "destructive",
+                title: "Update Failed",
+                description: "Could not add status history.",
+            });
+        }
+    };
+
     return (
-      <div className="p-2 bg-muted/20">
-        <h4 className="text-sm font-semibold mb-2">Status History</h4>
+      <div className="p-4 bg-muted/20 space-y-4">
+        <h4 className="text-sm font-semibold">Status History</h4>
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead>Status</TableHead>
               <TableHead>Date Changed</TableHead>
-              <TableHead>Acknowledgment No.</TableHead>
+              <TableHead>Notes</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -88,87 +142,145 @@ const ServiceHistory = ({ item }: { item: EditableInvoiceItem }) => {
               <TableRow key={index}>
                 <TableCell>{history.status}</TableCell>
                 <TableCell>{format(new Date(history.date), "PPP")}</TableCell>
-                <TableCell>{item.acknowledgmentNumber}</TableCell>
+                <TableCell className="text-sm text-muted-foreground">{history.notes || 'N/A'}</TableCell>
               </TableRow>
             ))}
+             {!item.statusHistory?.length && (
+                <TableRow>
+                    <TableCell colSpan={3} className="text-center text-muted-foreground">No history yet.</TableCell>
+                </TableRow>
+             )}
           </TableBody>
         </Table>
+
+        {isAdding ? (
+            <div className="p-4 border rounded-lg bg-background space-y-4">
+                <h5 className="font-medium">Add New Status Update</h5>
+                 <Select value={newStatus} onValueChange={(value) => setNewStatus(value as StatusHistory['status'])}>
+                    <SelectTrigger>
+                        <SelectValue placeholder="Select new status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="Under Process">Under Process</SelectItem>
+                        <SelectItem value="Completed">Completed</SelectItem>
+                        <SelectItem value="Cancelled by Customer">Cancelled by Customer</SelectItem>
+                    </SelectContent>
+                </Select>
+                <Popover>
+                    <PopoverTrigger asChild>
+                        <Button
+                            variant={"outline"}
+                            className={cn( "w-full justify-start text-left font-normal", !newDate && "text-muted-foreground" )}
+                        >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {newDate ? format(newDate, "PPP") : <span>Pick a date</span>}
+                        </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                        <Calendar mode="single" selected={newDate} onSelect={setNewDate} initialFocus />
+                    </PopoverContent>
+                </Popover>
+                <Textarea 
+                    placeholder="Add notes..."
+                    value={newNotes}
+                    onChange={(e) => setNewNotes(e.target.value)}
+                />
+                <div className="flex gap-2 justify-end">
+                    <Button variant="ghost" size="sm" onClick={() => setIsAdding(false)}>Cancel</Button>
+                    <Button size="sm" onClick={handleAddHistory}>Add Update</Button>
+                </div>
+            </div>
+        ) : (
+            <div className="text-right">
+                <Button variant="outline" size="sm" onClick={() => setIsAdding(true)}>Add Status Update</Button>
+            </div>
+        )}
       </div>
     );
 };
 
-const ServiceRow = ({ serviceItem, invoices }: { serviceItem: EditableInvoiceItem, invoices: Invoice[] | null }) => {
+const ServiceRow = ({ serviceItem, onUpdate }: { serviceItem: EditableInvoiceItem, onUpdate: () => void }) => {
     const { firestore } = useFirebase();
     const { toast } = useToast();
+    const [isOpen, setIsOpen] = React.useState(false);
     const [isHistoryOpen, setIsHistoryOpen] = React.useState(false);
 
+    // Get latest status from history or use top-level fields
+    const latestStatus = serviceItem.statusHistory?.[serviceItem.statusHistory.length - 1];
+
     const [editableItem, setEditableItem] = React.useState<Partial<InvoiceItem>>({
-        acknowledgmentNumber: serviceItem.acknowledgmentNumber || '',
-        processedDate: serviceItem.processedDate,
-        status: serviceItem.status || undefined,
+        acknowledgmentNumber: serviceItem.acknowledgmentNumber || latestStatus?.status || '',
+        processedDate: serviceItem.processedDate || latestStatus?.date,
+        status: serviceItem.status || latestStatus?.status,
     });
+     
+    // Sync when serviceItem prop changes
+    React.useEffect(() => {
+        const latestStatus = serviceItem.statusHistory?.[serviceItem.statusHistory.length - 1];
+        setEditableItem({
+             acknowledgmentNumber: serviceItem.acknowledgmentNumber || '',
+             processedDate: serviceItem.processedDate || latestStatus?.date,
+             status: serviceItem.status || latestStatus?.status,
+        })
+    }, [serviceItem])
+
 
     const handleFieldChange = <K extends keyof InvoiceItem>(field: K, value: InvoiceItem[K]) => {
         setEditableItem(prev => ({ ...prev, [field]: value }));
     };
 
     const handleSave = async () => {
-        if (!firestore || !invoices) return;
-
+        if (!firestore) return;
+    
         const invoiceDocRef = doc(firestore, 'invoices', serviceItem.invoiceId);
-        const invoiceToUpdate = invoices.find(inv => inv.id === serviceItem.invoiceId);
-
-        if (invoiceToUpdate) {
-            const updatedItems = [...invoiceToUpdate.items];
-            const originalItem = updatedItems[serviceItem.originalIndex];
-
-            const newStatusHistoryEntry: StatusHistory | undefined = editableItem.status ? {
-                status: editableItem.status,
-                date: editableItem.processedDate || new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
-            } : undefined;
-
-            const updatedStatusHistory = newStatusHistoryEntry
-                ? [...(originalItem.statusHistory || []), newStatusHistoryEntry]
-                : originalItem.statusHistory;
-
-            updatedItems[serviceItem.originalIndex] = {
-                ...originalItem,
-                acknowledgmentNumber: editableItem.acknowledgmentNumber,
-                processedDate: editableItem.processedDate,
-                status: editableItem.status,
-                statusHistory: updatedStatusHistory,
-            };
-
-            try {
-                await updateDoc(invoiceDocRef, { items: updatedItems });
-                toast({
-                    title: "Service Updated",
-                    description: "The service details have been saved successfully.",
-                });
-            } catch (error) {
-                console.error("Error updating service:", error);
-                toast({
-                    variant: "destructive",
-                    title: "Update Failed",
-                    description: "Could not save the service details.",
-                });
+    
+        try {
+            // To update an item in an array, we must read the whole array,
+            // update it in memory, and then write the entire array back.
+            const docSnap = await (await fetch(`/api/invoices/${serviceItem.invoiceId}`)).json() as Invoice;
+            if (docSnap) {
+                const invoiceData = docSnap;
+                const updatedItems = [...(invoiceData.items || [])];
+                const itemToUpdate = updatedItems[serviceItem.originalIndex];
+    
+                if (itemToUpdate) {
+                    updatedItems[serviceItem.originalIndex] = {
+                        ...itemToUpdate,
+                        acknowledgmentNumber: editableItem.acknowledgmentNumber,
+                        // Note: We don't update status/date directly here anymore
+                        // They are derived from the latest statusHistory entry.
+                    };
+    
+                    await updateDoc(invoiceDocRef, { items: updatedItems });
+                    toast({
+                        title: "Service Updated",
+                        description: "The acknowledgment number has been saved.",
+                    });
+                    onUpdate(); // Trigger refresh
+                }
             }
+        } catch (error) {
+            console.error("Error updating service:", error);
+            toast({
+                variant: "destructive",
+                title: "Update Failed",
+                description: "Could not save the service details.",
+            });
         }
     };
 
 
     return (
-        <Collapsible asChild>
+        <Collapsible open={isOpen} onOpenChange={setIsOpen} asChild>
             <>
                 <TableRow>
                     <TableCell>
-                    <CollapsibleTrigger asChild>
-                        <Button variant="ghost" size="sm">
-                            {isHistoryOpen ? <ChevronDownIcon /> : <ChevronRightIcon />}
+                        <CollapsibleTrigger asChild>
+                           <Button variant="ghost" size="icon" className="h-8 w-8">
+                            {isOpen ? <ChevronDownIcon className="h-4 w-4" /> : <ChevronRightIcon className="h-4 w-4" />}
                             <span className="sr-only">Toggle History</span>
-                        </Button>
-                    </CollapsibleTrigger>
+                           </Button>
+                        </CollapsibleTrigger>
                         {serviceItem.name}
                     </TableCell>
                     <TableCell>{serviceItem.invoiceNumber || 'N/A'}</TableCell>
@@ -180,43 +292,10 @@ const ServiceRow = ({ serviceItem, invoices }: { serviceItem: EditableInvoiceIte
                         />
                     </TableCell>
                     <TableCell>
-                        <Popover>
-                            <PopoverTrigger asChild>
-                                <Button
-                                    variant={"outline"}
-                                    className={cn(
-                                        "w-[150px] justify-start text-left font-normal h-8",
-                                        !editableItem.processedDate && "text-muted-foreground"
-                                    )}
-                                >
-                                    <CalendarIcon className="mr-2 h-4 w-4" />
-                                    {editableItem.processedDate ? format(new Date(editableItem.processedDate), "PPP") : <span>Pick a date</span>}
-                                </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0">
-                                <Calendar
-                                    mode="single"
-                                    selected={editableItem.processedDate ? new Date(editableItem.processedDate) : undefined}
-                                    onSelect={(date) => handleFieldChange('processedDate', date?.toISOString())}
-                                    initialFocus
-                                />
-                            </PopoverContent>
-                        </Popover>
+                        {editableItem.processedDate ? format(new Date(editableItem.processedDate), "PPP") : <span className="text-muted-foreground">N/A</span>}
                     </TableCell>
                     <TableCell>
-                        <Select
-                            value={editableItem.status || ''}
-                            onValueChange={(value) => handleFieldChange('status', value as InvoiceItem['status'])}
-                        >
-                            <SelectTrigger className="w-[180px] h-8">
-                                <SelectValue placeholder="Select status" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="Under Process">Under Process</SelectItem>
-                                <SelectItem value="Completed">Completed</SelectItem>
-                                <SelectItem value="Cancelled by Customer">Cancelled by Customer</SelectItem>
-                            </SelectContent>
-                        </Select>
+                        {editableItem.status ? <Badge variant="outline">{editableItem.status}</Badge> : <span className="text-muted-foreground">N/A</span>}
                     </TableCell>
                     <TableCell className="text-right">{serviceItem.quantity}</TableCell>
                     <TableCell className="text-right">₹{serviceItem.price.toFixed(2)}</TableCell>
@@ -231,7 +310,12 @@ const ServiceRow = ({ serviceItem, invoices }: { serviceItem: EditableInvoiceIte
                 <CollapsibleContent asChild>
                     <TableRow>
                         <TableCell colSpan={9}>
-                            <ServiceHistory item={{...serviceItem, ...editableItem}} />
+                           <ServiceHistory 
+                             item={serviceItem} 
+                             invoiceId={serviceItem.invoiceId}
+                             originalIndex={serviceItem.originalIndex}
+                             onHistoryUpdate={onUpdate}
+                            />
                         </TableCell>
                     </TableRow>
                 </CollapsibleContent>
@@ -241,20 +325,13 @@ const ServiceRow = ({ serviceItem, invoices }: { serviceItem: EditableInvoiceIte
 };
 
 
-const ServicesSubTable = ({ row }: { row: Row<Customer> }) => {
-    const { firestore } = useFirebase();
+const ServicesSubTable = ({ row, onUpdate, invoices }: { row: Row<Customer>, onUpdate: () => void, invoices: Invoice[] | null }) => {
     const customerId = row.original.id;
-
-    const invoicesQuery = useMemoFirebase(() => {
-        if (!firestore || !customerId) return null;
-        return query(collection(firestore, 'invoices'), where('customerId', '==', customerId));
-    }, [firestore, customerId]);
-
-    const { data: invoices, isLoading } = useCollection<Invoice>(invoicesQuery);
 
     const services = React.useMemo((): EditableInvoiceItem[] => {
         if (!invoices) return [];
-        return invoices.flatMap(invoice =>
+        const customerInvoices = invoices.filter(inv => inv.customerId === customerId);
+        return customerInvoices.flatMap(invoice =>
             (invoice.items || []).map((item, index) => ({
                 ...item,
                 invoiceId: invoice.id,
@@ -262,12 +339,8 @@ const ServicesSubTable = ({ row }: { row: Row<Customer> }) => {
                 originalIndex: index
             }))
         );
-    }, [invoices]);
+    }, [invoices, customerId]);
 
-
-    if (isLoading) {
-        return <div className="px-4 py-2 text-sm text-muted-foreground">Loading services...</div>
-    }
 
     if (!services || services.length === 0) {
         return <div className="px-4 py-2 text-sm text-muted-foreground">No services found for this customer.</div>
@@ -291,7 +364,7 @@ const ServicesSubTable = ({ row }: { row: Row<Customer> }) => {
                 </TableHeader>
                 <TableBody>
                     {services.map((item, index) => (
-                       <ServiceRow key={`${item.invoiceId}-${item.originalIndex}`} serviceItem={item} invoices={invoices} />
+                       <ServiceRow key={`${item.invoiceId}-${item.originalIndex}`} serviceItem={item} onUpdate={onUpdate} />
                     ))}
                 </TableBody>
             </Table>
@@ -306,11 +379,15 @@ export default function CustomersPage() {
   const [searchBy, setSearchBy] = React.useState('name');
   const [editingCustomer, setEditingCustomer] = React.useState<Customer | null>(null);
 
-  const customersQuery = useMemoFirebase(() => firestore ? collection(firestore, 'customers') : null, [firestore]);
+  // Force re-render state
+  const [refreshKey, setRefreshKey] = React.useState(0);
+  const forceUpdate = React.useCallback(() => setRefreshKey(k => k + 1), []);
+
+  const customersQuery = useMemoFirebase(() => firestore ? collection(firestore, 'customers') : null, [firestore, refreshKey]);
   const { data: customersData, isLoading: isLoadingCustomers } = useCollection<Customer>(customersQuery);
   const customers = customersData || [];
 
-  const invoicesQuery = useMemoFirebase(() => firestore ? collection(firestore, 'invoices') : null, [firestore]);
+  const invoicesQuery = useMemoFirebase(() => firestore ? collection(firestore, 'invoices') : null, [firestore, refreshKey]);
   const { data: invoicesData } = useCollection<Invoice>(invoicesQuery);
   const invoices = invoicesData || [];
 
@@ -320,6 +397,7 @@ export default function CustomersPage() {
       const form = e.currentTarget;
       const formData = new FormData(form);
       
+      const newCustomerRef = doc(collection(firestore, 'customers'));
       const newCustomerData = {
           name: formData.get('name') as string,
           email: formData.get('email') as string,
@@ -327,15 +405,17 @@ export default function CustomersPage() {
           aadhaar: formData.get('aadhaar') as string,
           pan: formData.get('pan') as string,
           avatar: `avatar-${(customers.length % 6) + 1}`,
+          id: newCustomerRef.id,
       };
       
       try {
-        await addDocumentNonBlocking(collection(firestore, 'customers'), newCustomerData);
+        await (await fetch(`/api/customers`, { method: 'POST', body: JSON.stringify(newCustomerData) })).json();
         toast({
           title: "Customer Added",
           description: `${newCustomerData.name} has been added successfully.`,
         });
         form.reset();
+        forceUpdate();
       } catch(error) {
         console.error("Error adding customer: ", error);
         toast({
@@ -359,14 +439,14 @@ export default function CustomersPage() {
           pan: formData.get('pan-edit') as string,
       };
 
-      const docRef = doc(firestore, 'customers', editingCustomer.id);
       try {
-        await setDocumentNonBlocking(docRef, updatedData, { merge: true });
+        await (await fetch(`/api/customers/${editingCustomer.id}`, { method: 'PUT', body: JSON.stringify(updatedData) })).json();
         toast({
           title: "Customer Updated",
           description: "Customer details have been updated successfully.",
         });
         setEditingCustomer(null);
+        forceUpdate();
       } catch (error) {
         console.error("Error updating customer: ", error);
         toast({
@@ -377,13 +457,14 @@ export default function CustomersPage() {
       }
   }
 
-  const handleDeleteCustomer = (customerId: string) => {
+  const handleDeleteCustomer = async (customerId: string) => {
     if (!firestore) return;
-    deleteDocumentNonBlocking(doc(firestore, 'customers', customerId));
+    await fetch(`/api/customers/${customerId}`, { method: 'DELETE' });
     toast({
         title: "Customer Deleted",
         description: "The customer has been deleted.",
       });
+    forceUpdate();
   }
 
   const columns: ColumnDef<Customer>[] = [
@@ -501,6 +582,7 @@ export default function CustomersPage() {
     getFilteredRowModel: getFilteredRowModel(),
     getExpandedRowModel: getExpandedRowModel(),
     getRowCanExpand: () => true,
+    key: refreshKey,
   });
 
   return (
@@ -680,7 +762,7 @@ export default function CustomersPage() {
                 {row.getIsExpanded() && (
                     <TableRow>
                         <TableCell colSpan={columns.length}>
-                            <ServicesSubTable row={row} />
+                            <ServicesSubTable row={row} onUpdate={forceUpdate} invoices={invoices} />
                         </TableCell>
                     </TableRow>
                 )}

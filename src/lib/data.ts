@@ -36,6 +36,7 @@ export type StatusHistory = {
   status: 'Under Process' | 'Completed' | 'Cancelled by Customer';
   date: string;
   updatedAt: string;
+  notes?: string;
 };
 
 export type InvoiceItem = {
