@@ -57,6 +57,8 @@ import { addDocumentNonBlocking, setDocumentNonBlocking, deleteDocumentNonBlocki
 const getImage = (id: string) =>
   PlaceHolderImages.find((img) => img.id === id);
 
+type ServiceItemWithInvoice = InvoiceItem & { invoiceNumber?: string; };
+
 const ServicesSubTable = ({ row }: { row: Row<Customer> }) => {
     const { firestore } = useFirebase();
     const customerId = row.original.id;
@@ -70,7 +72,12 @@ const ServicesSubTable = ({ row }: { row: Row<Customer> }) => {
 
     const services = React.useMemo(() => {
         if (!invoices) return [];
-        return invoices.flatMap(invoice => invoice.items as InvoiceItem[]);
+        return invoices.flatMap(invoice => 
+            (invoice.items || []).map(item => ({
+                ...item,
+                invoiceNumber: invoice.invoiceNumber
+            }))
+        );
     }, [invoices]);
 
 
@@ -88,6 +95,7 @@ const ServicesSubTable = ({ row }: { row: Row<Customer> }) => {
                 <TableHeader>
                     <TableRow>
                         <TableHead>Service/Item</TableHead>
+                        <TableHead>Invoice No.</TableHead>
                         <TableHead>Acknowledgment No.</TableHead>
                         <TableHead>Processed Date</TableHead>
                         <TableHead>Status</TableHead>
@@ -100,6 +108,7 @@ const ServicesSubTable = ({ row }: { row: Row<Customer> }) => {
                     {services.map((item, index) => (
                         <TableRow key={index}>
                             <TableCell>{item.name}</TableCell>
+                            <TableCell>{item.invoiceNumber || 'N/A'}</TableCell>
                             <TableCell>{item.acknowledgmentNumber || 'N/A'}</TableCell>
                             <TableCell>{item.processedDate || 'N/A'}</TableCell>
                             <TableCell>
@@ -141,7 +150,8 @@ export default function CustomersPage() {
   const handleAddNewCustomer = (e: React.FormEvent<HTMLFormElement>) => {
       e.preventDefault();
       if (!firestore) return;
-      const formData = new FormData(e.currentTarget);
+      const form = e.currentTarget;
+      const formData = new FormData(form);
       const newDocRef = doc(collection(firestore, 'customers'));
       const newCustomerData = {
           id: newDocRef.id,
@@ -154,6 +164,7 @@ export default function CustomersPage() {
       };
       
       setDocumentNonBlocking(newDocRef, newCustomerData, {});
+      form.reset();
   };
   
   const handleUpdateCustomer = (e: React.FormEvent<HTMLFormElement>) => {
