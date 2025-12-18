@@ -285,60 +285,63 @@ const ServiceRow = ({ serviceItem, onUpdate }: { serviceItem: EditableInvoiceIte
     };
 
     return (
-        <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-          <CollapsibleTrigger asChild>
-            <TableRow>
-              <TableCell>
-                <Button variant="ghost" size="icon" className="h-8 w-8">
-                  {isOpen ? (
-                    <ChevronDownIcon className="h-4 w-4" />
-                  ) : (
-                    <ChevronRightIcon className="h-4 w-4" />
-                  )}
-                  <span className="sr-only">Toggle History</span>
-                </Button>
-                {serviceItem.name}
-              </TableCell>
-              <TableCell>{serviceItem.invoiceNumber || "N/A"}</TableCell>
-              <TableCell>
-                <Input
-                  value={editableItem.acknowledgmentNumber || ""}
-                  onChange={(e) =>
-                    handleFieldChange("acknowledgmentNumber", e.target.value)
-                  }
-                  className="h-8"
-                />
-              </TableCell>
-              <TableCell>
-                {editableItem.processedDate ? (
-                  format(new Date(editableItem.processedDate), "PPP")
+        <React.Fragment>
+          <TableRow>
+            <TableCell>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => setIsOpen(!isOpen)}
+              >
+                {isOpen ? (
+                  <ChevronDownIcon className="h-4 w-4" />
                 ) : (
-                  <span className="text-muted-foreground">N/A</span>
+                  <ChevronRightIcon className="h-4 w-4" />
                 )}
-              </TableCell>
-              <TableCell>
-                {editableItem.status ? (
-                  <Badge variant="outline">{editableItem.status}</Badge>
-                ) : (
-                  <span className="text-muted-foreground">N/A</span>
-                )}
-              </TableCell>
-              <TableCell className="text-right">{serviceItem.quantity}</TableCell>
-              <TableCell className="text-right">
-                ₹{serviceItem.price.toFixed(2)}
-              </TableCell>
-              <TableCell className="text-right">
-                ₹{serviceItem.total.toFixed(2)}
-              </TableCell>
-              <TableCell>
-                <Button variant="ghost" size="icon" onClick={handleSave}>
-                  <SaveIcon className="h-4 w-4" />
-                  <span className="sr-only">Save</span>
-                </Button>
-              </TableCell>
-            </TableRow>
-          </CollapsibleTrigger>
-          <CollapsibleContent>
+                <span className="sr-only">Toggle History</span>
+              </Button>
+              {serviceItem.name}
+            </TableCell>
+            <TableCell>{serviceItem.invoiceNumber || "N/A"}</TableCell>
+            <TableCell>
+              <Input
+                value={editableItem.acknowledgmentNumber || ""}
+                onChange={(e) =>
+                  handleFieldChange("acknowledgmentNumber", e.target.value)
+                }
+                className="h-8"
+              />
+            </TableCell>
+            <TableCell>
+              {editableItem.processedDate ? (
+                format(new Date(editableItem.processedDate), "PPP")
+              ) : (
+                <span className="text-muted-foreground">N/A</span>
+              )}
+            </TableCell>
+            <TableCell>
+              {editableItem.status ? (
+                <Badge variant="outline">{editableItem.status}</Badge>
+              ) : (
+                <span className="text-muted-foreground">N/A</span>
+              )}
+            </TableCell>
+            <TableCell className="text-right">{serviceItem.quantity}</TableCell>
+            <TableCell className="text-right">
+              ₹{serviceItem.price.toFixed(2)}
+            </TableCell>
+            <TableCell className="text-right">
+              ₹{serviceItem.total.toFixed(2)}
+            </TableCell>
+            <TableCell>
+              <Button variant="ghost" size="icon" onClick={handleSave}>
+                <SaveIcon className="h-4 w-4" />
+                <span className="sr-only">Save</span>
+              </Button>
+            </TableCell>
+          </TableRow>
+          {isOpen && (
             <TableRow>
               <TableCell colSpan={9}>
                 <ServiceHistory
@@ -349,8 +352,8 @@ const ServiceRow = ({ serviceItem, onUpdate }: { serviceItem: EditableInvoiceIte
                 />
               </TableCell>
             </TableRow>
-          </CollapsibleContent>
-        </Collapsible>
+          )}
+        </React.Fragment>
       );
 };
 
@@ -441,19 +444,18 @@ export default function CustomersPage() {
     });
   }, [searchValue, searchBy, customers, invoices]);
 
-  const [expanded, setExpanded] = React.useState<ExpandedState>(
-    searchValue ? filteredData.reduce((acc, row) => ({ ...acc, [row.id]: true }), {}) : {}
-  );
+  const [expanded, setExpanded] = React.useState<ExpandedState>({});
   
   React.useEffect(() => {
     const newExpandedState: ExpandedState = searchValue
       ? filteredData.reduce((acc, row) => ({ ...acc, [row.id]: true }), {})
       : {};
-
-    const currentExpandedKeys = Object.keys(expanded);
-    const newExpandedKeys = Object.keys(newExpandedState);
-
-    if (currentExpandedKeys.length !== newExpandedKeys.length || !newExpandedKeys.every(key => currentExpandedKeys.includes(key))) {
+  
+    // Convert to strings for comparison to avoid object reference issues.
+    const currentExpandedKeys = JSON.stringify(Object.keys(expanded).sort());
+    const newExpandedKeys = JSON.stringify(Object.keys(newExpandedState).sort());
+  
+    if (currentExpandedKeys !== newExpandedKeys) {
       setExpanded(newExpandedState);
     }
   }, [searchValue, filteredData, expanded]);
@@ -837,5 +839,3 @@ export default function CustomersPage() {
     </div>
   );
 }
-
-    
