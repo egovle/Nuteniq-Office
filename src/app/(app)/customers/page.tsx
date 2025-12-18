@@ -286,7 +286,7 @@ const ServiceRow = ({ serviceItem, onUpdate }: { serviceItem: EditableInvoiceIte
 
     return (
         <Collapsible asChild open={isOpen} onOpenChange={setIsOpen}>
-          <>
+          <tbody>
             <TableRow>
               <TableCell>
                 <CollapsibleTrigger asChild>
@@ -341,19 +341,19 @@ const ServiceRow = ({ serviceItem, onUpdate }: { serviceItem: EditableInvoiceIte
                 </Button>
               </TableCell>
             </TableRow>
-            <TableRow>
-              <TableCell colSpan={9} className="p-0">
-                <CollapsibleContent>
-                  <ServiceHistory
-                    item={serviceItem}
-                    invoiceId={serviceItem.invoiceId}
-                    originalIndex={serviceItem.originalIndex}
-                    onHistoryUpdate={onUpdate}
-                  />
-                </CollapsibleContent>
-              </TableCell>
-            </TableRow>
-          </>
+            <CollapsibleContent asChild>
+                <TableRow>
+                <TableCell colSpan={9} className="p-0">
+                    <ServiceHistory
+                        item={serviceItem}
+                        invoiceId={serviceItem.invoiceId}
+                        originalIndex={serviceItem.originalIndex}
+                        onHistoryUpdate={onUpdate}
+                    />
+                </TableCell>
+                </TableRow>
+            </CollapsibleContent>
+          </tbody>
         </Collapsible>
       );
 };
@@ -471,6 +471,7 @@ export default function CustomersPage() {
           description: `${newCustomerData.name} has been added successfully.`,
         });
         form.reset();
+        (form.closest('[data-radix-collection-item]')?.querySelector('[aria-label="Close"]') as HTMLElement)?.click();
         forceUpdate();
       } catch(error) {
         console.error("Error adding customer: ", error);
@@ -517,12 +518,21 @@ export default function CustomersPage() {
 
   const handleDeleteCustomer = async (customerId: string) => {
     if (!firestore) return;
-    await deleteDoc(doc(firestore, 'customers', customerId));
-    toast({
-        title: "Customer Deleted",
-        description: "The customer has been deleted.",
-      });
-    forceUpdate();
+    try {
+        await deleteDoc(doc(firestore, 'customers', customerId));
+        toast({
+            title: "Customer Deleted",
+            description: "The customer has been deleted.",
+          });
+        forceUpdate();
+    } catch (error) {
+        console.error("Error deleting customer:", error)
+        toast({
+            variant: "destructive",
+            title: "Delete Failed",
+            description: "Could not delete customer.",
+          });
+    }
   }
 
   const columns: ColumnDef<Customer>[] = [
@@ -598,10 +608,12 @@ export default function CustomersPage() {
                   Copy customer ID
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => setEditingCustomer(customer)}>Edit customer</DropdownMenuItem>
+                <DialogTrigger asChild>
+                    <DropdownMenuItem onSelect={() => setEditingCustomer(customer)}>Edit customer</DropdownMenuItem>
+                </DialogTrigger>
                 <DropdownMenuItem 
                     onClick={() => handleDeleteCustomer(customer.id)}
-                    className="text-destructive">
+                    className="text-destructive focus:text-destructive focus:bg-destructive/10">
                   Delete customer
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -620,14 +632,14 @@ export default function CustomersPage() {
     getExpandedRowModel: getExpandedRowModel(),
     getRowCanExpand: () => true,
     state: {
-       expanded: searchValue ? filteredData.reduce((acc, row) => ({ ...acc, [row.id]: true }), {}) : expanded,
+       expanded: searchValue ? Object.fromEntries(filteredData.map(c => [c.id, true])) : expanded,
     },
     onExpandedChange: setExpanded,
     autoResetExpanded: false,
-    key: refreshKey,
   });
 
   return (
+    <Dialog>
     <div className="w-full">
       <div className="flex items-center justify-between py-4">
         <h1 className="text-2xl font-bold">Customers</h1>
@@ -653,11 +665,10 @@ export default function CustomersPage() {
                 className="max-w-sm"
                 />
             </div>
-            <Dialog>
-              <DialogTrigger asChild>
+            <DialogTrigger asChild>
                 <Button>Add Customer</Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-[425px]">
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[425px]">
                 <form onSubmit={handleAddNewCustomer}>
                   <DialogHeader>
                     <DialogTitle>Add New Customer</DialogTitle>
@@ -698,19 +709,15 @@ export default function CustomersPage() {
                     </div>
                   </div>
                   <DialogFooter>
-                      <DialogClose asChild>
-                          <Button type="submit">Save Customer</Button>
-                      </DialogClose>
+                    <Button type="submit">Save Customer</Button>
                   </DialogFooter>
                 </form>
               </DialogContent>
-            </Dialog>
         </div>
       </div>
       
       {/* Edit Customer Dialog */}
-      <Dialog open={!!editingCustomer} onOpenChange={(isOpen) => !isOpen && setEditingCustomer(null)}>
-        <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[425px]">
           <form onSubmit={handleUpdateCustomer}>
             <DialogHeader>
               <DialogTitle>Edit Customer</DialogTitle>
@@ -756,8 +763,7 @@ export default function CustomersPage() {
                 </DialogClose>
             </DialogFooter>
           </form>
-        </DialogContent>
-      </Dialog>
+      </DialogContent>
       
       <div className="rounded-md border">
         <Table>
@@ -824,5 +830,8 @@ export default function CustomersPage() {
         </Table>
       </div>
     </div>
+    </Dialog>
   );
 }
+
+    
