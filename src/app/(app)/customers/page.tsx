@@ -288,16 +288,14 @@ const ServiceRow = ({ serviceItem, onUpdate }: { serviceItem: EditableInvoiceIte
         <React.Fragment>
           <TableRow>
             <TableCell>
-              <CollapsibleTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setIsOpen(!isOpen)}>
-                  {isOpen ? (
-                    <ChevronDownIcon className="h-4 w-4" />
-                  ) : (
-                    <ChevronRightIcon className="h-4 w-4" />
-                  )}
-                  <span className="sr-only">Toggle History</span>
-                </Button>
-              </CollapsibleTrigger>
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setIsOpen(!isOpen)}>
+                {isOpen ? (
+                  <ChevronDownIcon className="h-4 w-4" />
+                ) : (
+                  <ChevronRightIcon className="h-4 w-4" />
+                )}
+                <span className="sr-only">Toggle History</span>
+              </Button>
               {serviceItem.name}
             </TableCell>
             <TableCell>{serviceItem.invoiceNumber || "N/A"}</TableCell>
@@ -339,7 +337,7 @@ const ServiceRow = ({ serviceItem, onUpdate }: { serviceItem: EditableInvoiceIte
             </TableCell>
           </TableRow>
           {isOpen && (
-            <TableRow>
+             <TableRow>
               <TableCell colSpan={9}>
                  <CollapsibleContent>
                     <ServiceHistory
@@ -396,9 +394,7 @@ const ServicesSubTable = ({ row, onUpdate, invoices }: { row: Row<Customer>, onU
                 </TableHeader>
                 <TableBody>
                     {services.map((item) => (
-                       <Collapsible key={`${item.invoiceId}-${item.originalIndex}`} asChild>
-                           <ServiceRow serviceItem={item} onUpdate={onUpdate} />
-                       </Collapsible>
+                       <ServiceRow key={`${item.invoiceId}-${item.originalIndex}`} serviceItem={item} onUpdate={onUpdate} />
                     ))}
                 </TableBody>
             </Table>
@@ -627,22 +623,14 @@ export default function CustomersPage() {
 
   React.useEffect(() => {
     if (searchValue) {
-      const newExpandedState: ExpandedState = {};
-      table.getRowModel().rows.forEach(row => {
-        newExpandedState[row.id] = true;
-      });
-  
-      // Only update state if it has actually changed to prevent loops
-      if (JSON.stringify(newExpandedState) !== JSON.stringify(expanded)) {
-        setExpanded(newExpandedState);
-      }
+        // Expand all rows when a search is active
+        table.toggleAllRowsExpanded(true);
     } else {
-      if (Object.keys(expanded).length > 0) {
-        setExpanded({});
-      }
+        // Collapse all rows when search is cleared
+        table.toggleAllRowsExpanded(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchValue, filteredData]);
+  }, [searchValue, table]);
 
 
   return (
@@ -844,3 +832,5 @@ export default function CustomersPage() {
     </div>
   );
 }
+
+    
