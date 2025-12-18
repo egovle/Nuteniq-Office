@@ -24,10 +24,8 @@ export type Customer = {
 export type Employee = {
   id:string;
   name: string;
-  email: string;
-  role: string;
+  mobile: string;
   avatar: string;
-  skills: string[];
   workload: number;
   availability: boolean;
 };

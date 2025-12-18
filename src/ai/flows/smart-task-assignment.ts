@@ -16,7 +16,6 @@ const SmartTaskInputSchema = z.object({
   taskDescription: z.string().describe('Detailed description of the task requirements.'),
   priority: z.enum(['High', 'Medium', 'Low']).describe('Priority level of the task.'),
   dueDate: z.string().describe('The date by which the task must be completed.'),
-  staffSkills: z.array(z.string()).describe('List of available staff members and their skills.'),
   staffWorkload: z
     .record(z.string(), z.number())
     .describe('Current workload of each staff member (e.g., number of tasks).'),
@@ -29,7 +28,7 @@ export type SmartTaskInput = z.infer<typeof SmartTaskInputSchema>;
 const SmartTaskOutputSchema = z.object({
   suggestedStaff: z
     .string()
-    .describe('The staff member suggested for the task, based on skills, workload, and availability.'),
+    .describe('The staff member suggested for the task, based on workload and availability.'),
   reasoning: z
     .string()
     .describe('The AI reasoning behind the staff member suggestion, explaining the factors considered.'),
@@ -50,7 +49,6 @@ const smartTaskAssignmentPrompt = ai.definePrompt({
   - Task requirements ({{{taskDescription}}})
   - Priority ({{{priority}}})
   - Due date ({{{dueDate}}})
-  - Staff skills ({{{staffSkills}}})
   - Staff workload ({{{staffWorkload}}})
   - Staff availability ({{{staffAvailability}}})
 

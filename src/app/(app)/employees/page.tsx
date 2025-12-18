@@ -37,7 +37,6 @@ import { type Employee } from "@/lib/data";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { PlaceHolderImages } from "@/lib/placeholder-images";
 import Image from "next/image";
-import { Badge } from "@/components/ui/badge";
 import { useCollection, useFirebase, useMemoFirebase } from "@/firebase";
 import { collection } from "firebase/firestore";
 import { addDocumentNonBlocking } from "@/firebase/non-blocking-updates";
@@ -69,27 +68,11 @@ export default function EmployeesPage() {
             </Avatar>
             <div className="flex flex-col">
               <span className="font-medium">{employee.name}</span>
-              <span className="text-sm text-muted-foreground">{employee.email}</span>
+              <span className="text-sm text-muted-foreground">{employee.mobile}</span>
             </div>
           </div>
         );
       },
-    },
-    {
-      accessorKey: "role",
-      header: "Role",
-    },
-    {
-      accessorKey: "skills",
-      header: "Skills",
-      cell: ({ row }) => {
-          const skills = row.getValue("skills") as string[];
-          return (
-              <div className="flex flex-wrap gap-1">
-                  {skills && skills.map(skill => <Badge key={skill} variant="secondary">{skill}</Badge>)}
-              </div>
-          )
-      }
     },
     {
       id: "actions",
@@ -137,9 +120,7 @@ export default function EmployeesPage() {
     const formData = new FormData(e.currentTarget);
     const newEmployee = {
         name: formData.get('name') as string,
-        email: formData.get('email') as string,
-        role: formData.get('role') as string,
-        skills: (formData.get('skills') as string).split(',').map(s => s.trim()),
+        mobile: formData.get('mobile') as string,
         avatar: `avatar-${(data.length % 6) + 1}`,
         workload: 0,
         availability: true,
@@ -171,22 +152,10 @@ export default function EmployeesPage() {
                   <Input id="name" name="name" className="col-span-3" />
                 </div>
                 <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="email" className="text-right">
-                    Email
+                  <Label htmlFor="mobile" className="text-right">
+                    Mobile
                   </Label>
-                  <Input id="email" name="email" type="email" className="col-span-3" />
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="role" className="text-right">
-                    Role
-                  </Label>
-                  <Input id="role" name="role" className="col-span-3" />
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="skills" className="text-right">
-                    Skills
-                  </Label>
-                  <Input id="skills" name="skills" placeholder="Comma-separated skills" className="col-span-3" />
+                  <Input id="mobile" name="mobile" type="tel" className="col-span-3" />
                 </div>
               </div>
               <DialogFooter>

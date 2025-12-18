@@ -8,7 +8,9 @@ import {
   assignTask,
   type SmartTaskOutput,
 } from "@/ai/flows/smart-task-assignment";
-import { employees } from "@/lib/data";
+import { useCollection, useFirebase, useMemoFirebase } from "@/firebase";
+import { collection } from "firebase/firestore";
+import { type Employee } from "@/lib/data";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -58,6 +60,12 @@ export default function SmartAssignmentPage() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<SmartTaskOutput | null>(null);
   const { toast } = useToast();
+  const { firestore } = useFirebase();
+
+  const employeesQuery = useMemoFirebase(() => firestore ? collection(firestore, 'employees') : null, [firestore]);
+  const { data: employeesData } = useCollection<Employee>(employeesQuery);
+  const employees = employeesData || [];
+
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -71,7 +79,6 @@ export default function SmartAssignmentPage() {
     setLoading(true);
     setResult(null);
 
-    const staffSkills = employees.map((e) => `${e.name}: ${e.skills.join(", ")}`);
     const staffWorkload = employees.reduce((acc, e) => {
       acc[e.name] = e.workload;
       return acc;
@@ -85,7 +92,6 @@ export default function SmartAssignmentPage() {
       const aiResult = await assignTask({
         ...values,
         dueDate: format(values.dueDate, "yyyy-MM-dd"),
-        staffSkills,
         staffWorkload,
         staffAvailability,
       });
@@ -112,7 +118,7 @@ export default function SmartAssignmentPage() {
             <CardHeader>
               <CardTitle>Smart Task Assignment</CardTitle>
               <CardDescription>
-                Let AI suggest the best person for the job based on skills, workload, and availability.
+                Let AI suggest the best person for the job based on workload and availability.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -192,7 +198,7 @@ export default function SmartAssignmentPage() {
               />
             </CardContent>
             <CardFooter>
-              <Button type="submit" disabled={loading} className="w-full">
+              <Button type="submit" disabled={loading || employees.length === 0} className="w-full">
                 {loading ? "Analyzing..." : "Find Best Assignee"}
                 <Sparkles className="ml-2 h-4 w-4" />
               </Button>
@@ -231,7 +237,7 @@ export default function SmartAssignmentPage() {
                 </Avatar>
                 <div>
                   <h3 className="text-lg font-bold">{result.suggestedStaff}</h3>
-                  <p className="text-muted-foreground">{suggestedEmployee.role}</p>
+                  <p className="text-muted-foreground">{suggestedEmployee.mobile}</p>
                 </div>
               </div>
               <div>
