@@ -285,75 +285,76 @@ const ServiceRow = ({ serviceItem, onUpdate }: { serviceItem: EditableInvoiceIte
     };
 
     return (
-        <React.Fragment>
-          <TableRow>
-            <TableCell>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8"
-                onClick={() => setIsOpen(!isOpen)}
-              >
-                {isOpen ? (
-                  <ChevronDownIcon className="h-4 w-4" />
-                ) : (
-                  <ChevronRightIcon className="h-4 w-4" />
-                )}
-                <span className="sr-only">Toggle History</span>
-              </Button>
-              {serviceItem.name}
-            </TableCell>
-            <TableCell>{serviceItem.invoiceNumber || "N/A"}</TableCell>
-            <TableCell>
-              <Input
-                value={editableItem.acknowledgmentNumber || ""}
-                onChange={(e) =>
-                  handleFieldChange("acknowledgmentNumber", e.target.value)
-                }
-                className="h-8"
-              />
-            </TableCell>
-            <TableCell>
-              {editableItem.processedDate ? (
-                format(new Date(editableItem.processedDate), "PPP")
-              ) : (
-                <span className="text-muted-foreground">N/A</span>
-              )}
-            </TableCell>
-            <TableCell>
-              {editableItem.status ? (
-                <Badge variant="outline">{editableItem.status}</Badge>
-              ) : (
-                <span className="text-muted-foreground">N/A</span>
-              )}
-            </TableCell>
-            <TableCell className="text-right">{serviceItem.quantity}</TableCell>
-            <TableCell className="text-right">
-              ₹{serviceItem.price.toFixed(2)}
-            </TableCell>
-            <TableCell className="text-right">
-              ₹{serviceItem.total.toFixed(2)}
-            </TableCell>
-            <TableCell>
-              <Button variant="ghost" size="icon" onClick={handleSave}>
-                <SaveIcon className="h-4 w-4" />
-                <span className="sr-only">Save</span>
-              </Button>
-            </TableCell>
-          </TableRow>
-          {isOpen && (
+        <Collapsible asChild open={isOpen} onOpenChange={setIsOpen}>
+          <>
             <TableRow>
-              <TableCell colSpan={9}>
-                <ServiceHistory
-                  item={serviceItem}
-                  invoiceId={serviceItem.invoiceId}
-                  originalIndex={serviceItem.originalIndex}
-                  onHistoryUpdate={onUpdate}
+              <TableCell>
+                <CollapsibleTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                    {isOpen ? (
+                      <ChevronDownIcon className="h-4 w-4" />
+                    ) : (
+                      <ChevronRightIcon className="h-4 w-4" />
+                    )}
+                    <span className="sr-only">Toggle History</span>
+                  </Button>
+                </CollapsibleTrigger>
+                {serviceItem.name}
+              </TableCell>
+              <TableCell>{serviceItem.invoiceNumber || "N/A"}</TableCell>
+              <TableCell>
+                <Input
+                  value={editableItem.acknowledgmentNumber || ""}
+                  onChange={(e) =>
+                    handleFieldChange("acknowledgmentNumber", e.target.value)
+                  }
+                  className="h-8"
                 />
               </TableCell>
+              <TableCell>
+                {editableItem.processedDate ? (
+                  format(new Date(editableItem.processedDate), "PPP")
+                ) : (
+                  <span className="text-muted-foreground">N/A</span>
+                )}
+              </TableCell>
+              <TableCell>
+                {editableItem.status ? (
+                  <Badge variant="outline">{editableItem.status}</Badge>
+                ) : (
+                  <span className="text-muted-foreground">N/A</span>
+                )}
+              </TableCell>
+              <TableCell className="text-right">
+                {serviceItem.quantity}
+              </TableCell>
+              <TableCell className="text-right">
+                ₹{serviceItem.price.toFixed(2)}
+              </TableCell>
+              <TableCell className="text-right">
+                ₹{serviceItem.total.toFixed(2)}
+              </TableCell>
+              <TableCell>
+                <Button variant="ghost" size="icon" onClick={handleSave}>
+                  <SaveIcon className="h-4 w-4" />
+                  <span className="sr-only">Save</span>
+                </Button>
+              </TableCell>
             </TableRow>
-          )}
-        </React.Fragment>
+            <TableRow>
+              <TableCell colSpan={9} className="p-0">
+                <CollapsibleContent>
+                  <ServiceHistory
+                    item={serviceItem}
+                    invoiceId={serviceItem.invoiceId}
+                    originalIndex={serviceItem.originalIndex}
+                    onHistoryUpdate={onUpdate}
+                  />
+                </CollapsibleContent>
+              </TableCell>
+            </TableRow>
+          </>
+        </Collapsible>
       );
 };
 
@@ -446,21 +447,6 @@ export default function CustomersPage() {
 
   const [expanded, setExpanded] = React.useState<ExpandedState>({});
   
-  React.useEffect(() => {
-    const newExpandedState: ExpandedState = searchValue
-      ? filteredData.reduce((acc, row) => ({ ...acc, [row.id]: true }), {})
-      : {};
-  
-    // Convert to strings for comparison to avoid object reference issues.
-    const currentExpandedKeys = JSON.stringify(Object.keys(expanded).sort());
-    const newExpandedKeys = JSON.stringify(Object.keys(newExpandedState).sort());
-  
-    if (currentExpandedKeys !== newExpandedKeys) {
-      setExpanded(newExpandedState);
-    }
-  }, [searchValue, filteredData, expanded]);
-  
-
   const handleAddNewCustomer = async (e: React.FormEvent<HTMLFormElement>) => {
       e.preventDefault();
       if (!firestore) return;
@@ -634,9 +620,10 @@ export default function CustomersPage() {
     getExpandedRowModel: getExpandedRowModel(),
     getRowCanExpand: () => true,
     state: {
-       expanded,
+       expanded: searchValue ? filteredData.reduce((acc, row) => ({ ...acc, [row.id]: true }), {}) : expanded,
     },
     onExpandedChange: setExpanded,
+    autoResetExpanded: false,
     key: refreshKey,
   });
 
@@ -801,7 +788,7 @@ export default function CustomersPage() {
               </TableRow>
             ) : table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row) => (
-                <React.Fragment key={row.id}>
+                <React.Fragment key={row.original.id}>
                 <TableRow
                   data-state={row.getIsSelected() && "selected"}
                 >
