@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -285,12 +284,10 @@ const ServiceRow = ({ serviceItem, onUpdate }: { serviceItem: EditableInvoiceIte
     };
 
     return (
-        <Collapsible asChild open={isOpen} onOpenChange={setIsOpen}>
-          <tbody>
+        <React.Fragment>
             <TableRow>
               <TableCell>
-                <CollapsibleTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setIsOpen(!isOpen)}>
                     {isOpen ? (
                       <ChevronDownIcon className="h-4 w-4" />
                     ) : (
@@ -298,7 +295,6 @@ const ServiceRow = ({ serviceItem, onUpdate }: { serviceItem: EditableInvoiceIte
                     )}
                     <span className="sr-only">Toggle History</span>
                   </Button>
-                </CollapsibleTrigger>
                 {serviceItem.name}
               </TableCell>
               <TableCell>{serviceItem.invoiceNumber || "N/A"}</TableCell>
@@ -341,20 +337,19 @@ const ServiceRow = ({ serviceItem, onUpdate }: { serviceItem: EditableInvoiceIte
                 </Button>
               </TableCell>
             </TableRow>
-            <CollapsibleContent asChild>
+            {isOpen && (
                 <TableRow>
-                <TableCell colSpan={9} className="p-0">
-                    <ServiceHistory
-                        item={serviceItem}
-                        invoiceId={serviceItem.invoiceId}
-                        originalIndex={serviceItem.originalIndex}
-                        onHistoryUpdate={onUpdate}
-                    />
-                </TableCell>
+                    <TableCell colSpan={9} className="p-0">
+                        <ServiceHistory
+                            item={serviceItem}
+                            invoiceId={serviceItem.invoiceId}
+                            originalIndex={serviceItem.originalIndex}
+                            onHistoryUpdate={onUpdate}
+                        />
+                    </TableCell>
                 </TableRow>
-            </CollapsibleContent>
-          </tbody>
-        </Collapsible>
+            )}
+        </React.Fragment>
       );
 };
 
@@ -592,7 +587,7 @@ export default function CustomersPage() {
       cell: ({ row }) => {
         const customer = row.original;
         return (
-          <div className="text-right">
+          <Dialog>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="h-8 w-8 p-0">
@@ -618,7 +613,56 @@ export default function CustomersPage() {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-          </div>
+            {editingCustomer && editingCustomer.id === customer.id && (
+              <DialogContent className="sm:max-w-[425px]">
+                <form onSubmit={handleUpdateCustomer}>
+                  <DialogHeader>
+                    <DialogTitle>Edit Customer</DialogTitle>
+                    <DialogDescription>
+                      Update the details for the customer.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="grid gap-4 py-4">
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <Label htmlFor="name-edit" className="text-right">
+                        Name
+                      </Label>
+                      <Input id="name-edit" name="name-edit" defaultValue={editingCustomer?.name} className="col-span-3" required/>
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <Label htmlFor="email-edit" className="text-right">
+                        Email
+                      </Label>
+                      <Input id="email-edit" name="email-edit" type="email" defaultValue={editingCustomer?.email} className="col-span-3" />
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <Label htmlFor="mobile-edit" className="text-right">
+                          Mobile
+                      </Label>
+                      <Input id="mobile-edit" name="mobile-edit" defaultValue={editingCustomer?.mobile} className="col-span-3" />
+                      </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <Label htmlFor="aadhaar-edit" className="text-right">
+                        Aadhaar
+                      </Label>
+                      <Input id="aadhaar-edit" name="aadhaar-edit" defaultValue={editingCustomer?.aadhaar} className="col-span-3" />
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <Label htmlFor="pan-edit" className="text-right">
+                        PAN
+                      </Label>
+                      <Input id="pan-edit" name="pan-edit" defaultValue={editingCustomer?.pan} className="col-span-3" />
+                    </div>
+                  </div>
+                  <DialogFooter>
+                      <DialogClose asChild>
+                          <Button type="submit">Save Changes</Button>
+                      </DialogClose>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            )}
+          </Dialog>
         );
       },
     },
@@ -632,138 +676,104 @@ export default function CustomersPage() {
     getExpandedRowModel: getExpandedRowModel(),
     getRowCanExpand: () => true,
     state: {
-       expanded: searchValue ? Object.fromEntries(filteredData.map(c => [c.id, true])) : expanded,
+       expanded: expanded,
     },
     onExpandedChange: setExpanded,
     autoResetExpanded: false,
   });
 
+  React.useEffect(() => {
+    if (searchValue) {
+      const newExpandedState: ExpandedState = {};
+      filteredData.forEach(customer => {
+        newExpandedState[customer.id] = true;
+      });
+      setExpanded(newExpandedState);
+    } else {
+      setExpanded({});
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchValue, filteredData]);
+  
+
   return (
-    <Dialog>
     <div className="w-full">
-      <div className="flex items-center justify-between py-4">
-        <h1 className="text-2xl font-bold">Customers</h1>
-        <div className="flex items-center gap-2">
-            <div className="flex gap-2">
-                <Select value={searchBy} onValueChange={setSearchBy}>
-                    <SelectTrigger className="w-[180px]">
-                        <SelectValue placeholder="Search by..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="name">Name</SelectItem>
-                        <SelectItem value="mobile">Mobile</SelectItem>
-                        <SelectItem value="aadhaar">Aadhaar Number</SelectItem>
-                        <SelectItem value="invoiceNumber">Invoice Number</SelectItem>
-                    </SelectContent>
-                </Select>
-                <Input
-                placeholder={`Search by ${searchBy.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}...`}
-                value={searchValue}
-                onChange={(event) =>
-                    setSearchValue(event.target.value)
-                }
-                className="max-w-sm"
-                />
-            </div>
-            <DialogTrigger asChild>
-                <Button>Add Customer</Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px]">
-                <form onSubmit={handleAddNewCustomer}>
-                  <DialogHeader>
-                    <DialogTitle>Add New Customer</DialogTitle>
-                    <DialogDescription>
-                      Fill in the details for the new customer.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <div className="grid gap-4 py-4">
-                    <div className="grid grid-cols-4 items-center gap-4">
-                      <Label htmlFor="name" className="text-right">
-                        Name
-                      </Label>
-                      <Input id="name" name="name" className="col-span-3" required/>
+        <Dialog>
+            <div className="flex items-center justify-between py-4">
+                <h1 className="text-2xl font-bold">Customers</h1>
+                <div className="flex items-center gap-2">
+                    <div className="flex gap-2">
+                        <Select value={searchBy} onValueChange={setSearchBy}>
+                            <SelectTrigger className="w-[180px]">
+                                <SelectValue placeholder="Search by..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="name">Name</SelectItem>
+                                <SelectItem value="mobile">Mobile</SelectItem>
+                                <SelectItem value="aadhaar">Aadhaar Number</SelectItem>
+                                <SelectItem value="invoiceNumber">Invoice Number</SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <Input
+                        placeholder={`Search by ${searchBy.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}...`}
+                        value={searchValue}
+                        onChange={(event) =>
+                            setSearchValue(event.target.value)
+                        }
+                        className="max-w-sm"
+                        />
                     </div>
-                    <div className="grid grid-cols-4 items-center gap-4">
-                      <Label htmlFor="email" className="text-right">
-                        Email
-                      </Label>
-                      <Input id="email" name="email" type="email" className="col-span-3" />
-                    </div>
-                    <div className="grid grid-cols-4 items-center gap-4">
-                      <Label htmlFor="mobile" className="text-right">
-                        Mobile
-                      </Label>
-                      <Input id="mobile" name="mobile" className="col-span-3" />
-                    </div>
-                    <div className="grid grid-cols-4 items-center gap-4">
-                      <Label htmlFor="aadhaar" className="text-right">
-                        Aadhaar
-                      </Label>
-                      <Input id="aadhaar" name="aadhaar" className="col-span-3" />
-                    </div>
-                    <div className="grid grid-cols-4 items-center gap-4">
-                      <Label htmlFor="pan" className="text-right">
-                        PAN
-                      </Label>
-                      <Input id="pan" name="pan" className="col-span-3" />
-                    </div>
-                  </div>
-                  <DialogFooter>
-                    <Button type="submit">Save Customer</Button>
-                  </DialogFooter>
-                </form>
-              </DialogContent>
-        </div>
-      </div>
-      
-      {/* Edit Customer Dialog */}
-      <DialogContent className="sm:max-w-[425px]">
-          <form onSubmit={handleUpdateCustomer}>
-            <DialogHeader>
-              <DialogTitle>Edit Customer</DialogTitle>
-              <DialogDescription>
-                Update the details for the customer.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="name-edit" className="text-right">
-                  Name
-                </Label>
-                <Input id="name-edit" name="name-edit" defaultValue={editingCustomer?.name} className="col-span-3" required/>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="email-edit" className="text-right">
-                  Email
-                </Label>
-                <Input id="email-edit" name="email-edit" type="email" defaultValue={editingCustomer?.email} className="col-span-3" />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="mobile-edit" className="text-right">
-                    Mobile
-                </Label>
-                <Input id="mobile-edit" name="mobile-edit" defaultValue={editingCustomer?.mobile} className="col-span-3" />
+                    <DialogTrigger asChild>
+                        <Button>Add Customer</Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-[425px]">
+                        <form onSubmit={handleAddNewCustomer}>
+                        <DialogHeader>
+                            <DialogTitle>Add New Customer</DialogTitle>
+                            <DialogDescription>
+                            Fill in the details for the new customer.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="grid gap-4 py-4">
+                            <div className="grid grid-cols-4 items-center gap-4">
+                            <Label htmlFor="name" className="text-right">
+                                Name
+                            </Label>
+                            <Input id="name" name="name" className="col-span-3" required/>
+                            </div>
+                            <div className="grid grid-cols-4 items-center gap-4">
+                            <Label htmlFor="email" className="text-right">
+                                Email
+                            </Label>
+                            <Input id="email" name="email" type="email" className="col-span-3" />
+                            </div>
+                            <div className="grid grid-cols-4 items-center gap-4">
+                            <Label htmlFor="mobile" className="text-right">
+                                Mobile
+                            </Label>
+                            <Input id="mobile" name="mobile" className="col-span-3" />
+                            </div>
+                            <div className="grid grid-cols-4 items-center gap-4">
+                            <Label htmlFor="aadhaar" className="text-right">
+                                Aadhaar
+                            </Label>
+                            <Input id="aadhaar" name="aadhaar" className="col-span-3" />
+                            </div>
+                            <div className="grid grid-cols-4 items-center gap-4">
+                            <Label htmlFor="pan" className="text-right">
+                                PAN
+                            </Label>
+                            <Input id="pan" name="pan" className="col-span-3" />
+                            </div>
+                        </div>
+                        <DialogFooter>
+                            <Button type="submit">Save Customer</Button>
+                        </DialogFooter>
+                        </form>
+                    </DialogContent>
                 </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="aadhaar-edit" className="text-right">
-                  Aadhaar
-                </Label>
-                <Input id="aadhaar-edit" name="aadhaar-edit" defaultValue={editingCustomer?.aadhaar} className="col-span-3" />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="pan-edit" className="text-right">
-                  PAN
-                </Label>
-                <Input id="pan-edit" name="pan-edit" defaultValue={editingCustomer?.pan} className="col-span-3" />
-              </div>
             </div>
-            <DialogFooter>
-                <DialogClose asChild>
-                    <Button type="submit">Save Changes</Button>
-                </DialogClose>
-            </DialogFooter>
-          </form>
-      </DialogContent>
+        </Dialog>
       
       <div className="rounded-md border">
         <Table>
@@ -830,8 +840,5 @@ export default function CustomersPage() {
         </Table>
       </div>
     </div>
-    </Dialog>
   );
 }
-
-    
