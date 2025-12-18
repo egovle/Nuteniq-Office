@@ -285,72 +285,72 @@ const ServiceRow = ({ serviceItem, onUpdate }: { serviceItem: EditableInvoiceIte
     };
 
     return (
-        <React.Fragment>
-          <TableRow>
-            <TableCell>
-              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setIsOpen(!isOpen)}>
-                {isOpen ? (
-                  <ChevronDownIcon className="h-4 w-4" />
+        <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+          <CollapsibleTrigger asChild>
+            <TableRow>
+              <TableCell>
+                <Button variant="ghost" size="icon" className="h-8 w-8">
+                  {isOpen ? (
+                    <ChevronDownIcon className="h-4 w-4" />
+                  ) : (
+                    <ChevronRightIcon className="h-4 w-4" />
+                  )}
+                  <span className="sr-only">Toggle History</span>
+                </Button>
+                {serviceItem.name}
+              </TableCell>
+              <TableCell>{serviceItem.invoiceNumber || "N/A"}</TableCell>
+              <TableCell>
+                <Input
+                  value={editableItem.acknowledgmentNumber || ""}
+                  onChange={(e) =>
+                    handleFieldChange("acknowledgmentNumber", e.target.value)
+                  }
+                  className="h-8"
+                />
+              </TableCell>
+              <TableCell>
+                {editableItem.processedDate ? (
+                  format(new Date(editableItem.processedDate), "PPP")
                 ) : (
-                  <ChevronRightIcon className="h-4 w-4" />
+                  <span className="text-muted-foreground">N/A</span>
                 )}
-                <span className="sr-only">Toggle History</span>
-              </Button>
-              {serviceItem.name}
-            </TableCell>
-            <TableCell>{serviceItem.invoiceNumber || "N/A"}</TableCell>
-            <TableCell>
-              <Input
-                value={editableItem.acknowledgmentNumber || ""}
-                onChange={(e) =>
-                  handleFieldChange("acknowledgmentNumber", e.target.value)
-                }
-                className="h-8"
-              />
-            </TableCell>
-            <TableCell>
-              {editableItem.processedDate ? (
-                format(new Date(editableItem.processedDate), "PPP")
-              ) : (
-                <span className="text-muted-foreground">N/A</span>
-              )}
-            </TableCell>
-            <TableCell>
-              {editableItem.status ? (
-                <Badge variant="outline">{editableItem.status}</Badge>
-              ) : (
-                <span className="text-muted-foreground">N/A</span>
-              )}
-            </TableCell>
-            <TableCell className="text-right">{serviceItem.quantity}</TableCell>
-            <TableCell className="text-right">
-              ₹{serviceItem.price.toFixed(2)}
-            </TableCell>
-            <TableCell className="text-right">
-              ₹{serviceItem.total.toFixed(2)}
-            </TableCell>
-            <TableCell>
-              <Button variant="ghost" size="icon" onClick={handleSave}>
-                <SaveIcon className="h-4 w-4" />
-                <span className="sr-only">Save</span>
-              </Button>
-            </TableCell>
-          </TableRow>
-          {isOpen && (
-             <TableRow>
-              <TableCell colSpan={9}>
-                 <CollapsibleContent>
-                    <ServiceHistory
-                        item={serviceItem}
-                        invoiceId={serviceItem.invoiceId}
-                        originalIndex={serviceItem.originalIndex}
-                        onHistoryUpdate={onUpdate}
-                    />
-                 </CollapsibleContent>
+              </TableCell>
+              <TableCell>
+                {editableItem.status ? (
+                  <Badge variant="outline">{editableItem.status}</Badge>
+                ) : (
+                  <span className="text-muted-foreground">N/A</span>
+                )}
+              </TableCell>
+              <TableCell className="text-right">{serviceItem.quantity}</TableCell>
+              <TableCell className="text-right">
+                ₹{serviceItem.price.toFixed(2)}
+              </TableCell>
+              <TableCell className="text-right">
+                ₹{serviceItem.total.toFixed(2)}
+              </TableCell>
+              <TableCell>
+                <Button variant="ghost" size="icon" onClick={handleSave}>
+                  <SaveIcon className="h-4 w-4" />
+                  <span className="sr-only">Save</span>
+                </Button>
               </TableCell>
             </TableRow>
-          )}
-        </React.Fragment>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <TableRow>
+              <TableCell colSpan={9}>
+                <ServiceHistory
+                  item={serviceItem}
+                  invoiceId={serviceItem.invoiceId}
+                  originalIndex={serviceItem.originalIndex}
+                  onHistoryUpdate={onUpdate}
+                />
+              </TableCell>
+            </TableRow>
+          </CollapsibleContent>
+        </Collapsible>
       );
 };
 
@@ -408,8 +408,7 @@ export default function CustomersPage() {
   const [searchValue, setSearchValue] = React.useState('');
   const [searchBy, setSearchBy] = React.useState('name');
   const [editingCustomer, setEditingCustomer] = React.useState<Customer | null>(null);
-  const [expanded, setExpanded] = React.useState<ExpandedState>({});
-
+  
   // Force re-render state
   const [refreshKey, setRefreshKey] = React.useState(0);
   const forceUpdate = React.useCallback(() => setRefreshKey(k => k + 1), []);
@@ -421,6 +420,44 @@ export default function CustomersPage() {
   const invoicesQuery = useMemoFirebase(() => firestore ? collection(firestore, 'invoices') : null, [firestore, refreshKey]);
   const { data: invoicesData } = useCollection<Invoice>(invoicesQuery);
   const invoices = invoicesData || [];
+
+  const filteredData = React.useMemo(() => {
+    if (!searchValue) {
+      return customers;
+    }
+    const lowercasedFilter = searchValue.toLowerCase();
+
+    if (searchBy === 'invoiceNumber') {
+      const matchingCustomerIds = invoices
+        .filter(invoice => invoice.invoiceNumber?.toLowerCase().includes(lowercasedFilter))
+        .map(invoice => invoice.customerId);
+      const uniqueCustomerIds = [...new Set(matchingCustomerIds)];
+      return customers.filter(customer => uniqueCustomerIds.includes(customer.id));
+    }
+    
+    return customers.filter((customer) => {
+        const searchField = customer[searchBy as keyof Customer] as string | undefined;
+        return searchField?.toLowerCase().includes(lowercasedFilter);
+    });
+  }, [searchValue, searchBy, customers, invoices]);
+
+  const [expanded, setExpanded] = React.useState<ExpandedState>(
+    searchValue ? filteredData.reduce((acc, row) => ({ ...acc, [row.id]: true }), {}) : {}
+  );
+  
+  React.useEffect(() => {
+    const newExpandedState: ExpandedState = searchValue
+      ? filteredData.reduce((acc, row) => ({ ...acc, [row.id]: true }), {})
+      : {};
+
+    const currentExpandedKeys = Object.keys(expanded);
+    const newExpandedKeys = Object.keys(newExpandedState);
+
+    if (currentExpandedKeys.length !== newExpandedKeys.length || !newExpandedKeys.every(key => currentExpandedKeys.includes(key))) {
+      setExpanded(newExpandedState);
+    }
+  }, [searchValue, filteredData, expanded]);
+  
 
   const handleAddNewCustomer = async (e: React.FormEvent<HTMLFormElement>) => {
       e.preventDefault();
@@ -587,26 +624,6 @@ export default function CustomersPage() {
     },
   ];
 
-  const filteredData = React.useMemo(() => {
-    if (!searchValue) {
-      return customers;
-    }
-    const lowercasedFilter = searchValue.toLowerCase();
-
-    if (searchBy === 'invoiceNumber') {
-      const matchingCustomerIds = invoices
-        .filter(invoice => invoice.invoiceNumber?.toLowerCase().includes(lowercasedFilter))
-        .map(invoice => invoice.customerId);
-      const uniqueCustomerIds = [...new Set(matchingCustomerIds)];
-      return customers.filter(customer => uniqueCustomerIds.includes(customer.id));
-    }
-    
-    return customers.filter((customer) => {
-        const searchField = customer[searchBy as keyof Customer] as string | undefined;
-        return searchField?.toLowerCase().includes(lowercasedFilter);
-    });
-  }, [searchValue, searchBy, customers, invoices]);
-
   const table = useReactTable({
     data: filteredData,
     columns,
@@ -620,18 +637,6 @@ export default function CustomersPage() {
     onExpandedChange: setExpanded,
     key: refreshKey,
   });
-
-  React.useEffect(() => {
-    if (searchValue) {
-        // Expand all rows when a search is active
-        table.toggleAllRowsExpanded(true);
-    } else {
-        // Collapse all rows when search is cleared
-        table.toggleAllRowsExpanded(false);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchValue, table]);
-
 
   return (
     <div className="w-full">
