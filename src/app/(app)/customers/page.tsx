@@ -59,11 +59,6 @@ import { CalendarIcon, SaveIcon } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 
@@ -587,7 +582,7 @@ export default function CustomersPage() {
       cell: ({ row }) => {
         const customer = row.original;
         return (
-          <Dialog>
+          <Dialog open={editingCustomer?.id === customer.id} onOpenChange={(open) => !open && setEditingCustomer(null)}>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="h-8 w-8 p-0">
@@ -613,7 +608,6 @@ export default function CustomersPage() {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            {editingCustomer && editingCustomer.id === customer.id && (
               <DialogContent className="sm:max-w-[425px]">
                 <form onSubmit={handleUpdateCustomer}>
                   <DialogHeader>
@@ -661,7 +655,6 @@ export default function CustomersPage() {
                   </DialogFooter>
                 </form>
               </DialogContent>
-            )}
           </Dialog>
         );
       },
@@ -838,6 +831,24 @@ export default function CustomersPage() {
             )}
           </TableBody>
         </Table>
+      </div>
+      <div className="flex items-center justify-end space-x-2 py-4">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => table.previousPage()}
+          disabled={!table.getCanPreviousPage()}
+        >
+          Previous
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => table.nextPage()}
+          disabled={!table.getCanNextPage()}
+        >
+          Next
+        </Button>
       </div>
     </div>
   );
