@@ -40,7 +40,7 @@ import Image from "next/image";
 import { useCollection, useFirebase, useMemoFirebase } from "@/firebase";
 import { collection, doc, setDoc, deleteDoc } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
-import { addDocumentNonBlocking } from "@/firebase/non-blocking-updates";
+import { addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 
 const getImage = (id: string) =>
   PlaceHolderImages.find((img) => img.id === id);
@@ -58,7 +58,7 @@ export default function EmployeesPage() {
   const { data: employeesData, isLoading } = useCollection<Employee>(employeesQuery);
   const data = employeesData || [];
   
-  const handleUpdateEmployee = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleUpdateEmployee = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!firestore || !editingEmployee) return;
     
@@ -70,28 +70,20 @@ export default function EmployeesPage() {
 
     const employeeDocRef = doc(firestore, 'employees', editingEmployee.id);
 
-    try {
-      await setDoc(employeeDocRef, updatedData, { merge: true });
-      toast({
-        title: "Employee Updated",
-        description: "Employee details have been updated successfully.",
-      });
-      setEditingEmployee(null);
-      forceUpdate();
-    } catch (error) {
-      console.error("Error updating employee: ", error);
-      toast({
-        variant: "destructive",
-        title: "Update Failed",
-        description: "Could not update employee details.",
-      });
-    }
+    updateDocumentNonBlocking(employeeDocRef, updatedData);
+
+    toast({
+      title: "Employee Updated",
+      description: "Employee details have been updated successfully.",
+    });
+    setEditingEmployee(null);
+    forceUpdate();
   }
 
   const handleDeleteEmployee = async (employeeId: string) => {
     if (!firestore) return;
     try {
-        await deleteDoc(doc(firestore, 'employees', employeeId));
+        deleteDocumentNonBlocking(doc(firestore, 'employees', employeeId));
         toast({
             title: "Employee Deleted",
             description: "The employee has been deleted.",
@@ -219,7 +211,8 @@ export default function EmployeesPage() {
     };
     
     const newDocRef = doc(collection(firestore, 'employees'));
-    setDoc(newDocRef, { ...newEmployee, id: newDocRef.id });
+    addDocumentNonBlocking(collection(firestore, "employees"), { ...newEmployee, id: newDocRef.id });
+
 
     toast({
       title: "Employee Added",
