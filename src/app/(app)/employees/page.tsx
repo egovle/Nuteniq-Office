@@ -38,7 +38,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { PlaceHolderImages } from "@/lib/placeholder-images";
 import Image from "next/image";
 import { useCollection, useFirebase, useMemoFirebase } from "@/firebase";
-import { collection, doc, setDoc, deleteDoc } from "firebase/firestore";
+import { collection, doc } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 
@@ -76,6 +76,8 @@ export default function EmployeesPage() {
       title: "Employee Updated",
       description: "Employee details have been updated successfully.",
     });
+    
+    // Close the dialog programmatically after handling the update.
     setEditingEmployee(null);
     forceUpdate();
   }
@@ -177,9 +179,7 @@ export default function EmployeesPage() {
                       </div>
                     </div>
                     <DialogFooter>
-                        <DialogClose asChild>
-                            <Button type="submit">Save Changes</Button>
-                        </DialogClose>
+                      <Button type="submit">Save Changes</Button>
                     </DialogFooter>
                   </form>
                 </DialogContent>
