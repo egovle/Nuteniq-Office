@@ -77,6 +77,7 @@ export default function TasksPage() {
   const { firestore } = useFirebase();
   const [dueDate, setDueDate] = React.useState<Date | undefined>();
   const [isCalendarOpen, setIsCalendarOpen] = React.useState(false);
+  const [selectedDate, setSelectedDate] = React.useState<Date|undefined>(undefined);
 
   const tasksQuery = useMemoFirebase(() => firestore ? collection(firestore, 'tasks') : null, [firestore]);
   const { data: tasksData, isLoading: isLoadingTasks } = useCollection<Task>(tasksQuery);
@@ -353,13 +354,22 @@ export default function TasksPage() {
                     <PopoverContent className="w-auto p-0">
                       <Calendar
                         mode="single"
-                        selected={dueDate}
-                        onSelect={(date) => {
-                          setDueDate(date);
-                          setIsCalendarOpen(false);
-                        }}
+                        selected={selectedDate}
+                        onSelect={setSelectedDate}
                         initialFocus
                       />
+                       <div className="p-2 border-t border-border">
+                        <Button
+                          size="sm"
+                          className="w-full"
+                          onClick={() => {
+                            setDueDate(selectedDate);
+                            setIsCalendarOpen(false);
+                          }}
+                        >
+                          OK
+                        </Button>
+                      </div>
                     </PopoverContent>
                   </Popover>
                 </div>
